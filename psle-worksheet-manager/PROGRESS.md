@@ -32,6 +32,13 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 
 ---
 
+## GitHub
+
+- **Repo:** https://github.com/xiegu/psle-worksheet-manager (public)
+- **Issues:** 9 open issues tracking all remaining work — labelled `priority: high`, `enhancement`, `scraper`, `manual`
+
+---
+
 ## What Is Working
 
 - **Full app loads** in Chrome from `index.html` (no server needed)
@@ -71,22 +78,23 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 ## Next Steps
 
-### High priority
-- [ ] **Assign topics after import** — open each scraped paper in Edit, set Strand + Topic so library filters work
-- [ ] **Rotate API keys** — the key used in this session should be revoked at `platform.claude.com/settings/api-keys` and replaced with a new one
-- [ ] **Scrape more papers** — run scraper for other schools, years, and levels (P5, P4)
+### High priority (GitHub Issues #1–#3)
+- [ ] **Rotate API key** ([#1](https://github.com/xiegu/psle-worksheet-manager/issues/1)) — revoke old key at `platform.claude.com/settings/api-keys`
+- [ ] **Assign topics after import** ([#2](https://github.com/xiegu/psle-worksheet-manager/issues/2)) — open Nanyang paper in Edit, set Strand + Topic so library filters work
+- [ ] **Scrape more papers** ([#3](https://github.com/xiegu/psle-worksheet-manager/issues/3)) — run scraper for other schools, years, and levels (P5, P4)
 
 ### Nice to have
 - [x] **In-app Question Bank** — browse all questions across worksheets; filter by Level/Strand/Topic/Q-Type/Difficulty; multi-select + "Build Worksheet"; single-question "Use" and "Preview" with answer key
 - [x] **Diagram support** — scraper converts PDF pages to JPEG via `pdftoppm`; Claude returns `diagramBbox` coordinates; `sharp` crops each figure to a tight JPEG stored as `diagramImage` on the question; diagrams display in Preview, print, builder card, builder live preview, and Question Bank modal
-- [ ] **Batch print** — print multiple worksheets in one browser print session (page-break CSS already in place)
-- [ ] **Answer key page** — separate printable answer key sheet rather than bottom-of-page table
-- [ ] **Score tracking** — record student scores per worksheet per session
+- [x] **GitHub + issue tracking** — repo at github.com/xiegu/psle-worksheet-manager; all remaining tasks tracked as issues
+- [ ] **Batch print** ([#4](https://github.com/xiegu/psle-worksheet-manager/issues/4)) — print multiple worksheets in one browser print session (page-break CSS already in place)
+- [ ] **Answer key page** ([#5](https://github.com/xiegu/psle-worksheet-manager/issues/5)) — separate printable answer key sheet rather than bottom-of-page table
+- [ ] **Score tracking** ([#6](https://github.com/xiegu/psle-worksheet-manager/issues/6)) — record student scores per worksheet per session
 
 ### Scraper improvements
-- [ ] Fix HTTP 406 on listing page (add browser-like headers / cookie handling) to auto-discover all available papers
-- [ ] Support other subjects (English, Science, Chinese) — currently Maths only
-- [ ] Add `--years 2020-2025` range flag to batch-scrape multiple years in one run
+- [ ] Fix HTTP 406 on listing page ([#7](https://github.com/xiegu/psle-worksheet-manager/issues/7)) — add browser-like headers / cookie handling to auto-discover all available papers
+- [ ] Add `--years 2020-2025` range flag ([#8](https://github.com/xiegu/psle-worksheet-manager/issues/8)) — batch-scrape multiple years in one run
+- [ ] Support other subjects ([#9](https://github.com/xiegu/psle-worksheet-manager/issues/9)) — English, Science, Chinese; currently Maths only
 
 ---
 
@@ -107,4 +115,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-18*
+*Last updated: 2026-03-18 — GitHub repo created, 9 issues opened*
