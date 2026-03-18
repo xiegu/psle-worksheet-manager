@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PSLE 2026 Worksheet Manager</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- =====================================================================
+       Top navigation bar
+  ====================================================================== -->
+  <header class="app-header">
+    <div class="app-header__brand">
+      <div class="app-header__logo">WM</div>
+      <div class="app-header__title">
+        <span class="app-header__name">Worksheet Manager</span>
+        <span class="app-header__sub">PSLE 2026 &mdash; MOE Syllabus</span>
+      </div>
+    </div>
+
+    <nav class="app-nav">
+      <button class="nav-btn active" data-view="library">
+        <span class="nav-icon">&#9776;</span> Library
+      </button>
+      <button class="nav-btn" data-view="builder">
+        <span class="nav-icon">&#43;</span> New Worksheet
+      </button>
+      <button class="nav-btn" data-view="questionbank">
+        <span class="nav-icon">&#10067;</span> Question Bank
+      </button>
+    </nav>
+
+    <div class="app-header__actions">
+      <button class="icon-btn" id="btn-export" title="Export backup">&#8595; Export</button>
+      <button class="icon-btn" id="btn-import" title="Import backup">&#8593; Import</button>
+      <input type="file" id="import-file-input" accept=".json" style="display:none" />
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       Main content — views are swapped in here by the router
+  ====================================================================== -->
+  <main class="app-main" id="app-main">
+    <!-- Populated by app.js -->
+  </main>
+
+  <!-- =====================================================================
+       Toast notification
+  ====================================================================== -->
+  <div class="toast" id="toast" aria-live="polite"></div>
+
+  <!-- =====================================================================
+       Scripts — order matters: data → storage → modules → router
+  ====================================================================== -->
+  <script src="data/syllabus.js"></script>
+  <script src="modules/storage.js"></script>
+  <script src="modules/library.js"></script>
+  <script src="modules/builder.js"></script>
+  <script src="modules/preview.js"></script>
+  <script src="modules/questionbank.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>

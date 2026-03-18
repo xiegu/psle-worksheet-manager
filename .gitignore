@@ -1,0 +1,15 @@
+# Dependencies
+psle-worksheet-manager/scraper/node_modules/
+
+# Scraped PDFs (large binary files — kept locally in scraper/papers/)
+psle-worksheet-manager/scraper/papers/*.pdf
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo

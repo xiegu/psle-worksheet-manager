@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>P6 Algebra — Simple Linear Equations | Math Worksheet</title>
+  <style>
+    /* -----------------------------------------------------------------------
+       Screen styles
+    ----------------------------------------------------------------------- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Times New Roman", Times, serif;
+      font-size: 13pt;
+      color: #000;
+      background: #e8e8e8;
+      padding: 24px;
+    }
+
+    /* Toggle controls — screen only */
+    .print-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      justify-content: center;
+    }
+
+    .print-controls button {
+      padding: 8px 18px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #555;
+      border-radius: 4px;
+      background: #fff;
+    }
+
+    .print-controls button.active {
+      background: #1a56a0;
+      color: #fff;
+      border-color: #1a56a0;
+    }
+
+    /* A4 page shell */
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      background: #fff;
+      margin: 0 auto;
+      padding: 15mm;
+      position: relative;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    }
+
+    /* -----------------------------------------------------------------------
+       Header
+    ----------------------------------------------------------------------- */
+    .ws-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      border-bottom: 2.5px solid #000;
+      padding-bottom: 8px;
+      margin-bottom: 10px;
+    }
+
+    .ws-logo {
+      width: 52px;
+      height: 52px;
+      border: 1.5px solid #999;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9pt;
+      color: #aaa;
+      flex-shrink: 0;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .ws-title-block {
+      flex: 1;
+    }
+
+    .ws-title-block h1 {
+      font-size: 16pt;
+      font-weight: bold;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .ws-meta {
+      font-size: 10pt;
+      color: #333;
+      margin-top: 3px;
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .ws-meta span { white-space: nowrap; }
+
+    .badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 3px;
+      font-size: 8.5pt;
+      font-weight: bold;
+      vertical-align: middle;
+      margin-left: 4px;
+      letter-spacing: 0.02em;
+    }
+    .badge-new       { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .badge-moved-up  { background: #cce5ff; color: #004085; border: 1px solid #b8daff; }
+    .badge-moved-down{ background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+    .badge-level     { background: #1a56a0; color: #fff; font-size: 9pt; }
+
+    /* Teacher watermark (hidden on student copy) */
+    .teacher-watermark {
+      display: none;
+      position: absolute;
+      top: 18mm;
+      right: 15mm;
+      font-size: 11pt;
+      font-weight: bold;
+      color: #c0392b;
+      letter-spacing: 0.08em;
+      border: 2px solid #c0392b;
+      padding: 2px 8px;
+      transform: rotate(-15deg);
+      opacity: 0.7;
+    }
+
+    /* -----------------------------------------------------------------------
+       Student info row
+    ----------------------------------------------------------------------- */
+    .ws-info-row {
+      display: flex;
+      gap: 0;
+      border: 1.5px solid #000;
+      margin-bottom: 14px;
+    }
+
+    .ws-info-row .info-cell {
+      flex: 1;
+      padding: 5px 8px;
+      border-right: 1px solid #000;
+      font-size: 11pt;
+    }
+
+    .ws-info-row .info-cell:last-child { border-right: none; }
+
+    .ws-info-row .info-cell span {
+      display: block;
+      font-size: 8.5pt;
+      color: #555;
+      margin-bottom: 2px;
+      font-family: Arial, sans-serif;
+    }
+
+    .ws-info-row .info-cell .blank-line {
+      border-bottom: 1px solid #555;
+      min-width: 80px;
+      display: inline-block;
+      width: 100%;
+    }
+
+    /* -----------------------------------------------------------------------
+       Instructions
+    ----------------------------------------------------------------------- */
+    .ws-instructions {
+      font-size: 10pt;
+      font-style: italic;
+      margin-bottom: 12px;
+      padding: 5px 8px;
+      background: #f7f7f7;
+      border-left: 3px solid #1a56a0;
+    }
+
+    /* -----------------------------------------------------------------------
+       Questions
+    ----------------------------------------------------------------------- */
+    .question {
+      margin-bottom: 18px;
+      page-break-inside: avoid;
+    }
+
+    .question-stem {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+
+    .q-number {
+      font-weight: bold;
+      min-width: 28px;
+      flex-shrink: 0;
+    }
+
+    .q-marks {
+      font-size: 9pt;
+      color: #555;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .q-text { flex: 1; line-height: 1.5; }
+
+    /* Working space — dotted lines */
+    .working-space {
+      margin-left: 36px;
+      margin-top: 4px;
+    }
+
+    .working-line {
+      border-bottom: 1px dotted #bbb;
+      height: 22px;
+      width: 100%;
+    }
+
+    /* Answer box */
+    .answer-box {
+      margin-left: 36px;
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .answer-box .ans-label {
+      font-size: 10pt;
+      font-weight: bold;
+      white-space: nowrap;
+    }
+
+    .answer-box .ans-blank {
+      border-bottom: 1.5px solid #000;
+      flex: 1;
+      max-width: 160px;
+      height: 20px;
+    }
+
+    /* MCQ options */
+    .mcq-options {
+      margin-left: 36px;
+      margin-top: 6px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 24px;
+      font-size: 11pt;
+    }
+
+    .mcq-option { display: flex; align-items: baseline; gap: 6px; }
+    .mcq-circle {
+      width: 14px; height: 14px;
+      border: 1.5px solid #000;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    /* -----------------------------------------------------------------------
+       Section divider
+    ----------------------------------------------------------------------- */
+    .ws-section-label {
+      font-size: 10pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: #1a56a0;
+      color: #fff;
+      padding: 3px 8px;
+      margin-bottom: 12px;
+      margin-top: 6px;
+    }
+
+    /* -----------------------------------------------------------------------
+       Footer — marks summary
+    ----------------------------------------------------------------------- */
+    .ws-footer {
+      border-top: 2px solid #000;
+      margin-top: 20px;
+      padding-top: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11pt;
+    }
+
+    .marks-box {
+      border: 1.5px solid #000;
+      padding: 4px 14px;
+      font-size: 12pt;
+      font-weight: bold;
+    }
+
+    /* -----------------------------------------------------------------------
+       Answer key (teacher copy only — hidden by default)
+    ----------------------------------------------------------------------- */
+    .answer-key {
+      display: none;
+      margin-top: 24px;
+      border-top: 2px dashed #c0392b;
+      padding-top: 12px;
+    }
+
+    .answer-key h2 {
+      font-size: 13pt;
+      color: #c0392b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+    }
+
+    .answer-key table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11pt;
+    }
+
+    .answer-key th, .answer-key td {
+      border: 1px solid #ccc;
+      padding: 5px 10px;
+      text-align: left;
+    }
+
+    .answer-key th {
+      background: #f2dede;
+      font-weight: bold;
+    }
+
+    .working-text {
+      font-size: 9.5pt;
+      color: #555;
+      font-style: italic;
+    }
+
+    /* -----------------------------------------------------------------------
+       Teacher copy mode (toggled via JS / print class)
+    ----------------------------------------------------------------------- */
+    body.teacher-mode .teacher-watermark { display: block; }
+    body.teacher-mode .answer-key        { display: block; }
+
+    /* -----------------------------------------------------------------------
+       Print stylesheet
+    ----------------------------------------------------------------------- */
+    @media print {
+      body {
+        background: none;
+        padding: 0;
+        font-size: 12pt;
+      }
+
+      .print-controls { display: none !important; }
+
+      .page {
+        width: 210mm;
+        min-height: 297mm;
+        margin: 0;
+        padding: 15mm;
+        box-shadow: none;
+        page-break-after: always;
+      }
+
+      /* Prevent questions splitting across pages */
+      .question { page-break-inside: avoid; }
+
+      /* Student copy: hide answer key */
+      body:not(.teacher-mode) .answer-key { display: none !important; }
+
+      /* Teacher copy */
+      body.teacher-mode .answer-key  { display: block; }
+      body.teacher-mode .teacher-watermark { display: block; }
+
+      /* Remove backgrounds on badges for ink saving (optional — remove if colour printer) */
+      .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .ws-section-label { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Screen-only controls -->
+  <div class="print-controls">
+    <button id="btn-student" class="active" onclick="setMode('student')">Student Copy</button>
+    <button id="btn-teacher" onclick="setMode('teacher')">Teacher Copy</button>
+    <button onclick="window.print()">Print</button>
+  </div>
+
+  <!-- =====================================================================
+       A4 PAGE
+  ====================================================================== -->
+  <div class="page">
+
+    <!-- Teacher watermark (visible only in teacher mode) -->
+    <div class="teacher-watermark">ANSWER KEY</div>
+
+    <!-- Header -->
+    <div class="ws-header">
+      <div class="ws-logo">LOGO</div>
+      <div class="ws-title-block">
+        <h1>Math Worksheet</h1>
+        <div class="ws-meta">
+          <span>
+            Level: <span class="badge badge-level">P6</span>
+          </span>
+          <span>Topic: Algebra — Simple Linear Equations
+            <span class="badge badge-new">New 2026</span>
+          </span>
+          <span>Difficulty: Standard</span>
+          <span>Type: Practice</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Student info row -->
+    <div class="ws-info-row">
+      <div class="info-cell">
+        <span>Name</span>
+        <div class="blank-line"></div>
+      </div>
+      <div class="info-cell">
+        <span>Class</span>
+        <div class="blank-line"></div>
+      </div>
+      <div class="info-cell">
+        <span>Date</span>
+        <div class="blank-line"></div>
+      </div>
+      <div class="info-cell">
+        <span>Score</span>
+        <div class="blank-line"></div>
+      </div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="ws-instructions">
+      Answer all questions. Show your working clearly. Marks are awarded for correct working.
+    </div>
+
+    <!-- ===== Section A: Short Answer ===== -->
+    <div class="ws-section-label">Section A — Short Answer (2 marks each)</div>
+
+    <!-- Q1 -->
+    <div class="question">
+      <div class="question-stem">
+        <span class="q-number">Q1.</span>
+        <span class="q-text">Solve for <em>x</em>: &nbsp; 3<em>x</em> + 5 = 20</span>
+        <span class="q-marks">[2m]</span>
+      </div>
+      <div class="working-space">
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+      </div>
+      <div class="answer-box">
+        <span class="ans-label">Answer: <em>x</em> =</span>
+        <div class="ans-blank"></div>
+      </div>
+    </div>
+
+    <!-- Q2 -->
+    <div class="question">
+      <div class="question-stem">
+        <span class="q-number">Q2.</span>
+        <span class="q-text">Solve for <em>y</em>: &nbsp; 4<em>y</em> &minus; 7 = 13</span>
+        <span class="q-marks">[2m]</span>
+      </div>
+      <div class="working-space">
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+      </div>
+      <div class="answer-box">
+        <span class="ans-label">Answer: <em>y</em> =</span>
+        <div class="ans-blank"></div>
+      </div>
+    </div>
+
+    <!-- Q3 -->
+    <div class="question">
+      <div class="question-stem">
+        <span class="q-number">Q3.</span>
+        <span class="q-text">If 2<em>n</em> + 9 = 3<em>n</em> &minus; 1, find the value of <em>n</em>.</span>
+        <span class="q-marks">[2m]</span>
+      </div>
+      <div class="working-space">
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+      </div>
+      <div class="answer-box">
+        <span class="ans-label">Answer: <em>n</em> =</span>
+        <div class="ans-blank"></div>
+      </div>
+    </div>
+
+    <!-- ===== Section B: MCQ ===== -->
+    <div class="ws-section-label">Section B — Multiple Choice (1 mark each)</div>
+
+    <!-- Q4 -->
+    <div class="question">
+      <div class="question-stem">
+        <span class="q-number">Q4.</span>
+        <span class="q-text">Which value of <em>k</em> satisfies &nbsp; 5<em>k</em> = 35?</span>
+        <span class="q-marks">[1m]</span>
+      </div>
+      <div class="mcq-options">
+        <div class="mcq-option"><div class="mcq-circle"></div> (A) &nbsp; <em>k</em> = 5</div>
+        <div class="mcq-option"><div class="mcq-circle"></div> (B) &nbsp; <em>k</em> = 6</div>
+        <div class="mcq-option"><div class="mcq-circle"></div> (C) &nbsp; <em>k</em> = 7</div>
+        <div class="mcq-option"><div class="mcq-circle"></div> (D) &nbsp; <em>k</em> = 8</div>
+      </div>
+    </div>
+
+    <!-- Q5 -->
+    <div class="question">
+      <div class="question-stem">
+        <span class="q-number">Q5.</span>
+        <span class="q-text">Which expression represents "7 more than twice a number <em>p</em>"?</span>
+        <span class="q-marks">[1m]</span>
+      </div>
+      <div class="mcq-options">
+        <div class="mcq-option"><div class="mcq-circle"></div> (A) &nbsp; 7<em>p</em> + 2</div>
+        <div class="mcq-option"><div class="mcq-circle"></div> (B) &nbsp; 2<em>p</em> &minus; 7</div>
+        <div class="mcq-option"><div class="mcq-circle"></div> (C) &nbsp; 2<em>p</em> + 7</div>
+        <div class="mcq-option"><div class="mcq-circle"></div> (D) &nbsp; 2(<em>p</em> + 7)</div>
+      </div>
+    </div>
+
+    <!-- ===== Section C: Word Problem ===== -->
+    <div class="ws-section-label">Section C — Word Problem (4 marks)</div>
+
+    <!-- Q6 -->
+    <div class="question">
+      <div class="question-stem">
+        <span class="q-number">Q6.</span>
+        <span class="q-text">
+          Ali has <em>x</em> stickers. Ben has 3 times as many stickers as Ali.
+          Together they have 48 stickers. Write an equation and solve for <em>x</em>.
+          How many stickers does Ben have?
+        </span>
+        <span class="q-marks">[4m]</span>
+      </div>
+      <div class="working-space">
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+        <div class="working-line"></div>
+      </div>
+      <div class="answer-box">
+        <span class="ans-label">Answer: Ben has</span>
+        <div class="ans-blank"></div>
+        <span class="ans-label">stickers.</span>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="ws-footer">
+      <span>End of Worksheet</span>
+      <div class="marks-box">Total: &nbsp;&nbsp;&nbsp;&nbsp; / 12 marks</div>
+    </div>
+
+    <!-- ===== Answer Key (teacher copy only) ===== -->
+    <div class="answer-key">
+      <h2>Answer Key</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Q</th>
+            <th>Answer</th>
+            <th>Working / Notes</th>
+            <th>Marks</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Q1</td>
+            <td><em>x</em> = 5</td>
+            <td class="working-text">3<em>x</em> = 20 &minus; 5 = 15 &nbsp;&rarr;&nbsp; <em>x</em> = 5</td>
+            <td>2</td>
+          </tr>
+          <tr>
+            <td>Q2</td>
+            <td><em>y</em> = 5</td>
+            <td class="working-text">4<em>y</em> = 13 + 7 = 20 &nbsp;&rarr;&nbsp; <em>y</em> = 5</td>
+            <td>2</td>
+          </tr>
+          <tr>
+            <td>Q3</td>
+            <td><em>n</em> = 10</td>
+            <td class="working-text">2<em>n</em> &minus; 3<em>n</em> = &minus;1 &minus; 9 &nbsp;&rarr;&nbsp; &minus;<em>n</em> = &minus;10 &nbsp;&rarr;&nbsp; <em>n</em> = 10</td>
+            <td>2</td>
+          </tr>
+          <tr>
+            <td>Q4</td>
+            <td>(C) <em>k</em> = 7</td>
+            <td class="working-text">5 &times; 7 = 35</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>Q5</td>
+            <td>(C) 2<em>p</em> + 7</td>
+            <td class="working-text">"twice a number" = 2<em>p</em>; "7 more than" = + 7</td>
+            <td>1</td>
+          </tr>
+          <tr>
+            <td>Q6</td>
+            <td>Ben has 36 stickers</td>
+            <td class="working-text">
+              Equation: <em>x</em> + 3<em>x</em> = 48 &nbsp;&rarr;&nbsp; 4<em>x</em> = 48 &nbsp;&rarr;&nbsp; <em>x</em> = 12 (Ali)<br>
+              Ben = 3 &times; 12 = 36
+            </td>
+            <td>4</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div><!-- /.page -->
+
+  <script>
+    function setMode(mode) {
+      if (mode === 'teacher') {
+        document.body.classList.add('teacher-mode');
+        document.getElementById('btn-teacher').classList.add('active');
+        document.getElementById('btn-student').classList.remove('active');
+      } else {
+        document.body.classList.remove('teacher-mode');
+        document.getElementById('btn-student').classList.add('active');
+        document.getElementById('btn-teacher').classList.remove('active');
+      }
+    }
+  </script>
+
+</body>
+</html>
