@@ -298,6 +298,7 @@ function _htmlQCard(q) {
       <div class="qb-card__footer">
         <button class="btn btn-sm btn-primary qb-btn-use"     data-key="${_esc(q._key)}">Use</button>
         <button class="btn btn-sm           qb-btn-preview"   data-key="${_esc(q._key)}">Preview</button>
+        <button class="btn btn-sm           qb-btn-edit"      data-key="${_esc(q._key)}">Edit</button>
       </div>
     </div>
   `;
@@ -390,6 +391,11 @@ function _bindQBCardActions() {
 
     if (btn.classList.contains("qb-btn-preview")) {
       _previewQuestion(key);
+      return;
+    }
+
+    if (btn.classList.contains("qb-btn-edit")) {
+      _editQuestion(key);
       return;
     }
   });
@@ -522,6 +528,192 @@ function _showQPreviewModal(q) {
 
   // Trap focus on close button
   document.getElementById("qb-modal-close")?.focus();
+}
+
+// ---------------------------------------------------------------------------
+// Edit question modal
+// ---------------------------------------------------------------------------
+
+function _editQuestion(key) {
+  const allQ = _getAllEnrichedQuestions();
+  const q    = allQ.find(x => x._key === key);
+  if (!q) return;
+  _showQEditModal(q);
+}
+
+function _showQEditModal(q) {
+  document.getElementById("qb-edit-modal")?.remove();
+
+  const hasDiagram = !!q.diagramImage;
+
+  const modal = document.createElement("div");
+  modal.id        = "qb-edit-modal";
+  modal.className = "qb-modal-overlay";
+  modal.innerHTML = `
+    <div class="qb-modal" role="dialog" aria-modal="true" style="max-width:600px;width:90vw">
+      <div class="qb-modal__header">
+        <div style="font-weight:700;font-size:15px">Edit Question</div>
+        <button class="qb-modal__close" id="qb-edit-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="qb-modal__body" style="max-height:68vh;overflow-y:auto">
+        <label class="qb-edit-label">Question Text</label>
+        <textarea id="qb-edit-text" class="qb-edit-textarea" rows="5">${_esc(q.text || "")}</textarea>
+
+        ${hasDiagram ? `
+          <div id="qb-edit-diagram-section">
+            <label class="qb-edit-label">
+              Diagram &mdash; <span style="font-weight:400;text-transform:none;letter-spacing:0">drag on image to select crop area, then click Apply Crop</span>
+            </label>
+            <div class="qb-crop-container" id="qb-crop-container">
+              <img id="qb-crop-img" src="${q.diagramImage}" alt="Diagram" />
+              <canvas id="qb-crop-canvas"></canvas>
+            </div>
+            <div class="qb-crop-actions">
+              <button class="btn btn-sm btn-primary" id="qb-crop-apply">Apply Crop</button>
+              <button class="btn btn-sm" id="qb-crop-reset">Reset</button>
+            </div>
+            <div id="qb-crop-preview-wrap" style="display:none;margin-top:12px">
+              <label class="qb-edit-label">Cropped Preview</label>
+              <img id="qb-crop-preview" style="max-width:100%;border:1px solid var(--grey-300);border-radius:4px;display:block" />
+            </div>
+          </div>
+        ` : ""}
+      </div>
+      <div class="qb-modal__footer">
+        <button class="btn btn-primary" id="qb-edit-save">Save</button>
+        <button class="btn" id="qb-edit-cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  document.getElementById("qb-edit-close")?.addEventListener("click",  close);
+  document.getElementById("qb-edit-cancel")?.addEventListener("click", close);
+  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+
+  if (hasDiagram) _setupCropCanvas(q.diagramImage);
+
+  document.getElementById("qb-edit-save")?.addEventListener("click", () => {
+    const textEl   = document.getElementById("qb-edit-text");
+    const canvas   = document.getElementById("qb-crop-canvas");
+    const newText  = textEl?.value.trim() ?? q.text;
+    const newImage = canvas?.dataset.pendingCrop || null;
+
+    const ws = getWorksheet(q._wsId);
+    if (!ws) { alert("Worksheet not found."); return; }
+
+    const qIdx = (ws.questions || []).findIndex(x => x.id === q.id);
+    if (qIdx === -1) { alert("Question not found."); return; }
+
+    ws.questions[qIdx] = {
+      ...ws.questions[qIdx],
+      text: newText,
+      ...(newImage ? { diagramImage: newImage } : {})
+    };
+
+    try {
+      saveWorksheet(ws);
+      close();
+      _renderQBGrid();
+    } catch (err) {
+      alert("Save failed: " + err.message);
+    }
+  });
+
+  document.getElementById("qb-edit-close")?.focus();
+}
+
+function _setupCropCanvas(originalDiagramUrl) {
+  const imgEl  = document.getElementById("qb-crop-img");
+  const canvas = document.getElementById("qb-crop-canvas");
+  if (!imgEl || !canvas) return;
+
+  const sizeCanvas = () => {
+    canvas.width        = imgEl.clientWidth;
+    canvas.height       = imgEl.clientHeight;
+    canvas.style.width  = imgEl.clientWidth  + "px";
+    canvas.style.height = imgEl.clientHeight + "px";
+  };
+  if (imgEl.complete && imgEl.naturalWidth) sizeCanvas();
+  imgEl.addEventListener("load", sizeCanvas);
+
+  const ctx = canvas.getContext("2d");
+  let sel = null, dragging = false, startX = 0, startY = 0;
+
+  canvas.addEventListener("mousedown", e => {
+    const r = canvas.getBoundingClientRect();
+    startX   = e.clientX - r.left;
+    startY   = e.clientY - r.top;
+    dragging = true;
+    sel      = null;
+  });
+
+  canvas.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    const r  = canvas.getBoundingClientRect();
+    const ex = e.clientX - r.left;
+    const ey = e.clientY - r.top;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Darken everything outside selection
+    ctx.fillStyle = "rgba(0,0,0,0.40)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const sx = Math.min(startX, ex);
+    const sy = Math.min(startY, ey);
+    const sw = Math.abs(ex - startX);
+    const sh = Math.abs(ey - startY);
+
+    // Clear (brighten) the selection area
+    ctx.clearRect(sx, sy, sw, sh);
+    ctx.strokeStyle = "#2563eb";
+    ctx.lineWidth   = 2;
+    ctx.strokeRect(sx, sy, sw, sh);
+
+    sel = { x: sx, y: sy, w: sw, h: sh };
+  });
+
+  canvas.addEventListener("mouseup",    () => { dragging = false; });
+  canvas.addEventListener("mouseleave", () => { dragging = false; });
+
+  document.getElementById("qb-crop-apply")?.addEventListener("click", () => {
+    if (!sel || sel.w < 10 || sel.h < 10) {
+      alert("Drag on the image to select the area you want to keep.");
+      return;
+    }
+    const scaleX = imgEl.naturalWidth  / imgEl.clientWidth;
+    const scaleY = imgEl.naturalHeight / imgEl.clientHeight;
+
+    const cc = document.createElement("canvas");
+    cc.width  = Math.round(sel.w * scaleX);
+    cc.height = Math.round(sel.h * scaleY);
+    cc.getContext("2d").drawImage(
+      imgEl,
+      sel.x * scaleX, sel.y * scaleY, sel.w * scaleX, sel.h * scaleY,
+      0, 0, cc.width, cc.height
+    );
+    const croppedUrl = cc.toDataURL("image/jpeg", 0.9);
+
+    const prevWrap = document.getElementById("qb-crop-preview-wrap");
+    const prevImg  = document.getElementById("qb-crop-preview");
+    if (prevImg)  prevImg.src            = croppedUrl;
+    if (prevWrap) prevWrap.style.display = "block";
+
+    canvas.dataset.pendingCrop = croppedUrl;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    sel = null;
+  });
+
+  document.getElementById("qb-crop-reset")?.addEventListener("click", () => {
+    imgEl.src = originalDiagramUrl;
+    delete canvas.dataset.pendingCrop;
+    const prevWrap = document.getElementById("qb-crop-preview-wrap");
+    if (prevWrap) prevWrap.style.display = "none";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    sel = null;
+  });
 }
 
 // ---------------------------------------------------------------------------

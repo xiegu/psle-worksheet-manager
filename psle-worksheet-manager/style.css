@@ -844,6 +844,62 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 /* -------------------------------------------------------------------------
+   Question Bank — Edit modal & crop tool
+------------------------------------------------------------------------- */
+
+.qb-edit-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--grey-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 14px 0 6px;
+}
+
+.qb-edit-textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 8px 10px;
+  border: 1px solid var(--grey-300);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.qb-edit-textarea:focus { outline: none; border-color: var(--primary); }
+
+.qb-crop-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  border: 1px solid var(--grey-300);
+  border-radius: 6px;
+  overflow: hidden;
+  user-select: none;
+}
+.qb-crop-container img {
+  display: block;
+  max-width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+}
+#qb-crop-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  cursor: crosshair;
+}
+
+.qb-crop-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* -------------------------------------------------------------------------
    Print styles — hide all app chrome, show only worksheet content
 ------------------------------------------------------------------------- */
 @media print {

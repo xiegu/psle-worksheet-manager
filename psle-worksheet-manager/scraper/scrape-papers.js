@@ -47,7 +47,7 @@ const SCHOOL  = (args.school  || "ALL").trim();
 const TYPE    = (args.type    || "Prelim").trim();
 const SUBJECT = capitalise(args.subject || "Maths");
 const DRY_RUN = args["dry-run"] === true;
-const OUT_FILE = args.out || autoOutFile(LEVEL, SUBJECT, YEARS, TYPE);
+const OUT_FILE = args.out || autoOutFile(LEVEL, SUBJECT, YEARS, TYPE, SCHOOL);
 
 function parseYears(yearsArg, yearArg) {
   if (yearsArg) {
@@ -66,11 +66,12 @@ function capitalise(s) {
   return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s;
 }
 
-function autoOutFile(level, subject, years, type) {
-  const yearStr = years.length === 1 ? years[0] : `${years[0]}-${years[years.length - 1]}`;
-  const subj    = subject.toLowerCase();
-  const typeStr = type === "ALL" ? "all" : type.toLowerCase();
-  return `${level.toLowerCase()}-${subj}-${typeStr}-${yearStr}.json`;
+function autoOutFile(level, subject, years, type, school) {
+  const yearStr   = years.length === 1 ? years[0] : `${years[0]}-${years[years.length - 1]}`;
+  const subj      = subject.toLowerCase();
+  const typeStr   = type === "ALL" ? "all" : type.toLowerCase();
+  const schoolStr = school && school !== "ALL" ? `-${school.toLowerCase()}` : "";
+  return `${level.toLowerCase()}-${subj}-${typeStr}-${yearStr}${schoolStr}.json`;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,6 +249,56 @@ async function cropDiagram(pageDataUrl, bbox) {
     log(`   ⚠️  Crop failed (${e.message}), using full page`);
     return pageDataUrl;
   }
+}
+
+/**
+ * Second-pass refinement: sends the initial crop back to Claude vision and asks
+ * it to identify only the diagram portion within that image, then re-crops tightly.
+ * Falls back to the initial crop if refinement fails.
+ * @param {Anthropic} client
+ * @param {string} imageDataUrl - "data:image/jpeg;base64,..."
+ * @returns {Promise<string>}
+ */
+async function refineDiagramCrop(client, imageDataUrl) {
+  const base64 = imageDataUrl.replace(/^data:image\/jpeg;base64,/, "");
+  let bbox;
+  try {
+    const resp = await client.messages.create({
+      model:      "claude-sonnet-4-6",
+      max_tokens: 150,
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/jpeg", data: base64 }
+          },
+          {
+            type: "text",
+            text: `This image is a cropped region from a scanned exam paper. It may contain question text at the top, a diagram/figure/graph in the middle, and MCQ options or other text at the bottom.
+
+Return a JSON bounding box covering ONLY the diagram/figure/graph — tight around the visual graphic, excluding all printed text above and below it. If the whole image is just the diagram with no surrounding text, return {"x":0,"y":0,"w":1,"h":1}.
+
+Return ONLY this JSON, nothing else:
+{"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}`
+          }
+        ]
+      }]
+    });
+    const text = resp.content[0].text.trim()
+      .replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    bbox = JSON.parse(text);
+  } catch (e) {
+    log(`      ⚠️  Diagram refinement failed (${e.message}), keeping initial crop`);
+    return imageDataUrl;
+  }
+
+  // Skip re-crop if Claude says the whole image is the diagram
+  if (bbox.x < 0.02 && bbox.y < 0.02 && bbox.w > 0.96 && bbox.h > 0.96) {
+    return imageDataUrl;
+  }
+
+  return cropDiagram(imageDataUrl, bbox);
 }
 
 // ---------------------------------------------------------------------------
@@ -539,7 +590,8 @@ async function processPaper(client, paper) {
         const pageSrc = pageImages[pgIdx];
         if (pageSrc) {
           if (q.diagramBbox && typeof q.diagramBbox.x === "number") {
-            mapped.diagramImage = await cropDiagram(pageSrc, q.diagramBbox);
+            const initialCrop = await cropDiagram(pageSrc, q.diagramBbox);
+            mapped.diagramImage = await refineDiagramCrop(client, initialCrop);
           } else {
             // No bbox — fall back to full page
             mapped.diagramImage = pageSrc;
