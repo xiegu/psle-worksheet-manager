@@ -154,8 +154,9 @@ function unarchiveWorksheet(id) {
 function exportAll() {
   const data = {
     exportedAt: new Date().toISOString(),
-    version: 1,
-    worksheets: _load()
+    version: 2,
+    worksheets: _load(),
+    students:   _loadStudents()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -199,6 +200,18 @@ function importAll(jsonString) {
   }
 
   _save(Array.from(existingMap.values()));
+
+  // Merge student data if present (v2+ backups)
+  if (Array.isArray(parsed.students)) {
+    const existingStudents = _loadStudents();
+    const studentMap = new Map(existingStudents.map(s => [s.id, s]));
+    for (const stu of parsed.students) {
+      if (!stu.id || !stu.name) continue;
+      studentMap.set(stu.id, stu);
+    }
+    _saveStudents(Array.from(studentMap.values()));
+  }
+
   return { imported, skipped };
 }
 

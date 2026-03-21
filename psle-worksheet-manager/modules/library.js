@@ -475,8 +475,9 @@ function _handleRecordScore(wsId) {
     const obtained = parseInt(obtainedVal);
     const total    = parseInt(totalVal);
 
-    if (isNaN(obtained) || obtained < 0) { showToast("Enter a valid score.", "error"); return; }
-    if (isNaN(total) || total < 1)       { showToast("Total marks must be at least 1.", "error"); return; }
+    if (isNaN(obtained) || obtained < 0)  { showToast("Enter a valid score.", "error"); return; }
+    if (isNaN(total) || total < 1)        { showToast("Total marks must be at least 1.", "error"); return; }
+    if (obtained > total)                 { showToast("Score cannot exceed total marks.", "error"); return; }
 
     recordScore(stu.id, wsId, obtained, total, date);
 

@@ -23,6 +23,8 @@ let _selected = new Set(); // set of composite keys "wsId::qId"
 
 function renderQuestionBank(container) {
   _selected.clear();
+  // Reset hideTaken if no student is active so it doesn't silently filter
+  if (!getActiveStudent()) _qbFilters.hideTaken = false;
   const allQ = _getAllEnrichedQuestions();
 
   container.innerHTML = `
