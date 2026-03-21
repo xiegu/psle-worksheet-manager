@@ -367,7 +367,6 @@ function parsePapersFromHtml(html, level, year, school, type, subject) {
     if (school !== "ALL" && !paperSchool.toLowerCase().includes(school.toLowerCase())) continue;
     if (type   !== "ALL" && !paperType.toLowerCase().includes(type.toLowerCase()))     continue;
 
-    const resolvedPdfUrl = buildPdfUrl(href, level, year, paperSchool, paperType, subject);
     papers.push({
       title:     `${level} ${subj.pdfLabel} ${paperType} ${year} — ${paperSchool.replace(/_/g, " ")}`,
       school:    paperSchool,
@@ -376,7 +375,7 @@ function parsePapersFromHtml(html, level, year, school, type, subject) {
       year,
       subject,
       pageUrl:   href,
-      pdfUrl:    resolvedPdfUrl
+      pdfUrl:    pdfUrl(level, year, paperSchool, paperType, subject)  // pattern URL for display; real URL resolved in processPaper
     });
   }
 
