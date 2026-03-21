@@ -141,7 +141,7 @@ For EVERY question in this paper:
 4. If an answer key or answers section exists, extract the answer
 5. For MCQ questions, extract all 4 options (A, B, C, D)
 6. Note the page number of the PDF where this question appears (1-indexed)
-7. For questions that include a diagram, figure, graph, number line, table, or image, estimate its bounding box on the page as decimal fractions (0.0–1.0) of page width and height
+7. For questions that include a diagram, figure, graph, number line, table, or image, provide a tight bounding box around the visual element ONLY — do NOT include the question text, question number, marks label, or MCQ options (A/B/C/D) in the box. The box must start just above the top edge of the drawing/graphic and end just below its bottom edge, excluding all surrounding text.
 
 IMPORTANT RULES:
 - Include ALL questions — do not skip any
@@ -172,7 +172,8 @@ Notes:
 - "options" only for mcq type; omit or set [] for others
 - "pageNumber" is required for every question
 - "diagramBbox" only for questions with a diagram/figure; omit entirely for text-only questions
-- diagramBbox values are fractions of page dimensions: x/y = top-left corner, w/h = width/height`;
+- diagramBbox values are fractions of page dimensions: x/y = top-left corner, w/h = width/height
+- diagramBbox must be tight around the graphic only — exclude question text above and MCQ options below`;
 }
 
 // ---------------------------------------------------------------------------
