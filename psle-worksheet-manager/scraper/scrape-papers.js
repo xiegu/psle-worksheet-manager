@@ -75,6 +75,43 @@ function autoOutFile(level, subject, years, type, school) {
 }
 
 // ---------------------------------------------------------------------------
+// Maths taxonomy — mirrors data/syllabus.js (used to prompt Claude for classification)
+// ---------------------------------------------------------------------------
+
+const MATHS_TAXONOMY = {
+  P1: {
+    "Numbers & Algebra":       ["Whole Numbers (to 100)","Addition & Subtraction","Multiplication & Division","Money"],
+    "Measurement & Geometry":  ["Length (cm)","Time","2D Shapes"],
+    "Statistics":              ["Picture Graphs"]
+  },
+  P2: {
+    "Numbers & Algebra":       ["Whole Numbers (to 1,000)","Fractions (intro)","Money (dollars & cents)"],
+    "Measurement & Geometry":  ["Length (m)","Mass (kg, g)","Volume of Liquid (l)","Time (hours & minutes)","2D & 3D Shapes"],
+    "Statistics":              ["Graphs with Scales"]
+  },
+  P3: {
+    "Numbers & Algebra":       ["Whole Numbers (to 10,000)","Equivalent Fractions","Money (addition & subtraction)"],
+    "Measurement & Geometry":  ["Length (km)","Volume (ml)","Time (seconds, 24-hour clock)","Area & Perimeter","Angles & Lines"],
+    "Statistics":              ["Bar Graphs"]
+  },
+  P4: {
+    "Numbers & Algebra":       ["Whole Numbers (to 100,000)","Factors & Multiples","Fractions","Decimals & Operations"],
+    "Measurement & Geometry":  ["Area & Perimeter (squares, rectangles)","Angles (degrees)","Line Symmetry","Nets of 3D Solids","Pie Charts (intro)"],
+    "Statistics":              ["Tables","Line Graphs"]
+  },
+  P5: {
+    "Numbers & Algebra":       ["Whole Numbers (to 10 million)","Fractions","Decimals","Percentages","Ratio","Rate"],
+    "Measurement & Geometry":  ["Area of Triangle","Volume of Cube & Cuboid","Angles","Line Symmetry"],
+    "Statistics":              []
+  },
+  P6: {
+    "Numbers & Algebra":       ["Fractions (no calculator)","Percentages","Ratio","Algebra — Algebraic Expressions","Algebra — Simple Linear Equations","Average"],
+    "Measurement & Geometry":  ["Area & Circumference of Circle","Volume of Cube & Cuboid (advanced)"],
+    "Statistics":              ["Pie Charts"]
+  }
+};
+
+// ---------------------------------------------------------------------------
 // Subject configuration
 // ---------------------------------------------------------------------------
 
@@ -125,13 +162,29 @@ function pdfUrl(level, year, school, paperType, subject) {
 // Extraction prompt sent to Claude for each PDF
 // ---------------------------------------------------------------------------
 
-function getExtractionPrompt(subject) {
+function getExtractionPrompt(subject, level) {
   const subjectDesc = {
     Maths:   "Singapore primary school math exam paper (PSLE level)",
     English: "Singapore primary school English exam paper (PSLE level)",
     Science: "Singapore primary school Science exam paper (PSLE level)",
     Chinese: "Singapore primary school Chinese Language exam paper (PSLE level)",
   }[subject] || "Singapore primary school exam paper";
+
+  // Build taxonomy classification step for Maths
+  let taxonomyStep = "";
+  let taxonomySchemaFields = "";
+  let taxonomyNotes = "";
+  if (subject === "Maths" && MATHS_TAXONOMY[level]) {
+    const tax   = MATHS_TAXONOMY[level];
+    const lines = Object.entries(tax)
+      .filter(([, topics]) => topics.length > 0)
+      .map(([strand, topics]) => `   ${strand}: ${topics.join(" | ")}`);
+    taxonomyStep = `8. Classify each question to a strand and topic using EXACTLY these ${level} Maths names (do not invent new names):
+${lines.join("\n")}
+   If the question spans multiple topics, pick the primary one.`;
+    taxonomySchemaFields = `\n      "strand": "Numbers & Algebra",\n      "topic": "Fractions (no calculator)",`;
+    taxonomyNotes = `\n- "strand" and "topic" must use exactly the names from the taxonomy above`;
+  }
 
   return `You are extracting exam questions from a scanned ${subjectDesc}.
 
@@ -143,6 +196,7 @@ For EVERY question in this paper:
 5. For MCQ questions, extract all 4 options (A, B, C, D)
 6. Note the page number of the PDF where this question appears (1-indexed)
 7. For questions that include a diagram, figure, graph, number line, table, or image, provide a tight bounding box around the visual element ONLY — do NOT include the question text, question number, marks label, or MCQ options (A/B/C/D) in the box. The box must start just above the top edge of the drawing/graphic and end just below its bottom edge, excluding all surrounding text.
+${taxonomyStep}
 
 IMPORTANT RULES:
 - Include ALL questions — do not skip any
@@ -163,7 +217,7 @@ Return ONLY a valid JSON object in this exact format (no markdown, no explanatio
       "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
       "answer": "answer if available, else empty string",
       "working": "solution steps if available, else empty string",
-      "pageNumber": 1,
+      "pageNumber": 1,${taxonomySchemaFields}
       "diagramBbox": {"x": 0.05, "y": 0.30, "w": 0.90, "h": 0.35}
     }
   ]
@@ -174,7 +228,7 @@ Notes:
 - "pageNumber" is required for every question
 - "diagramBbox" only for questions with a diagram/figure; omit entirely for text-only questions
 - diagramBbox values are fractions of page dimensions: x/y = top-left corner, w/h = width/height
-- diagramBbox must be tight around the graphic only — exclude question text above and MCQ options below`;
+- diagramBbox must be tight around the graphic only — exclude question text above and MCQ options below${taxonomyNotes}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -537,7 +591,7 @@ async function processPaper(client, paper) {
           },
           {
             type: "text",
-            text: getExtractionPrompt(paper.subject || "Maths")
+            text: getExtractionPrompt(paper.subject || "Maths", paper.level || "P6")
           }
         ]
       }
@@ -560,47 +614,58 @@ async function processPaper(client, paper) {
   const id          = "ws_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
   const subjectCfg  = SUBJECT_CONFIG[paper.subject] || SUBJECT_CONFIG.Maths;
 
+  const mappedQs    = await Promise.all((extracted.questions || []).map(async (q, i) => {
+    const mapped = {
+      id:      q.id || `q${i + 1}`,
+      type:    q.type || "short_answer",
+      text:    q.text || "",
+      marks:   typeof q.marks === "number" ? q.marks : 1,
+      options: q.type === "mcq" ? (q.options || []) : [],
+      answer:  q.answer  || "",
+      working: q.working || "",
+      ...(q.strand ? { strand: q.strand } : {}),
+      ...(q.topic  ? { topic:  q.topic  } : {})
+    };
+
+    const hasDiagram = /\[Diagram:/i.test(q.text || "") || q.diagramBbox;
+    if (hasDiagram && pageImages.length > 0) {
+      const pgIdx   = (typeof q.pageNumber === "number" ? q.pageNumber : 1) - 1;
+      const pageSrc = pageImages[pgIdx];
+      if (pageSrc) {
+        if (q.diagramBbox && typeof q.diagramBbox.x === "number") {
+          const initialCrop = await cropDiagram(pageSrc, q.diagramBbox);
+          mapped.diagramImage = await refineDiagramCrop(client, initialCrop);
+        } else {
+          mapped.diagramImage = pageSrc;
+        }
+      }
+    }
+
+    return mapped;
+  }));
+
+  // Derive worksheet-level strand from the most common strand across questions
+  const strandCounts = {};
+  for (const q of mappedQs) {
+    if (q.strand) strandCounts[q.strand] = (strandCounts[q.strand] || 0) + 1;
+  }
+  const dominantStrand = Object.keys(strandCounts).length > 0
+    ? Object.entries(strandCounts).sort((a, b) => b[1] - a[1])[0][0]
+    : subjectCfg.defaultStrand;
+
   return {
     id,
     title:      paper.title,
     level:      paper.level,
-    strand:     subjectCfg.defaultStrand,  // tutor can adjust in app
-    topic:      "",                         // tutor assigns topic in app
+    strand:     dominantStrand,
+    topic:      "",   // mixed paper — tutor can refine per-question in Question Bank
     difficulty: "Standard",
     type:       "Exam-style",
     createdAt:  today,
     updatedAt:  today,
     version:    1,
     status:     "active",
-    questions:  await Promise.all((extracted.questions || []).map(async (q, i) => {
-      const mapped = {
-        id:      q.id || `q${i + 1}`,
-        type:    q.type || "short_answer",
-        text:    q.text || "",
-        marks:   typeof q.marks === "number" ? q.marks : 1,
-        options: q.type === "mcq" ? (q.options || []) : [],
-        answer:  q.answer  || "",
-        working: q.working || ""
-      };
-
-      // Attach cropped diagram image if this question has one
-      const hasDiagram = /\[Diagram:/i.test(q.text || "") || q.diagramBbox;
-      if (hasDiagram && pageImages.length > 0) {
-        const pgIdx   = (typeof q.pageNumber === "number" ? q.pageNumber : 1) - 1;
-        const pageSrc = pageImages[pgIdx];
-        if (pageSrc) {
-          if (q.diagramBbox && typeof q.diagramBbox.x === "number") {
-            const initialCrop = await cropDiagram(pageSrc, q.diagramBbox);
-            mapped.diagramImage = await refineDiagramCrop(client, initialCrop);
-          } else {
-            // No bbox — fall back to full page
-            mapped.diagramImage = pageSrc;
-          }
-        }
-      }
-
-      return mapped;
-    })),
+    questions:  mappedQs,
     notes: `Scraped from sgtestpaper.com | ${extracted.paperTitle || paper.title} | ${paper.year}`
   };
 }

@@ -50,8 +50,8 @@ function _getAllEnrichedQuestions() {
         _wsId:         ws.id,
         _wsTitle:      ws.title,
         _wsLevel:      ws.level,
-        _wsStrand:     ws.strand,
-        _wsTopic:      ws.topic,
+        _wsStrand:     q.strand || ws.strand,   // question-level overrides worksheet
+        _wsTopic:      q.topic  || ws.topic,
         _wsDifficulty: ws.difficulty,
         _wsType:       ws.type,
         _wsStatus:     ws.status
@@ -559,6 +559,27 @@ function _showQEditModal(q) {
         <label class="qb-edit-label">Question Text</label>
         <textarea id="qb-edit-text" class="qb-edit-textarea" rows="5">${_esc(q.text || "")}</textarea>
 
+        <div style="display:flex;gap:12px">
+          <div style="flex:1">
+            <label class="qb-edit-label">Strand</label>
+            <select id="qb-edit-strand" style="width:100%;padding:6px 8px;border:1px solid var(--grey-300);border-radius:6px;font-size:13px">
+              <option value="">— select —</option>
+              ${(getStrands(q._wsLevel) || []).map(s =>
+                `<option value="${_esc(s)}" ${(q.strand||q._wsStrand)===s?"selected":""}>${_esc(s)}</option>`
+              ).join("")}
+            </select>
+          </div>
+          <div style="flex:1">
+            <label class="qb-edit-label">Topic</label>
+            <select id="qb-edit-topic" style="width:100%;padding:6px 8px;border:1px solid var(--grey-300);border-radius:6px;font-size:13px">
+              <option value="">— select —</option>
+              ${(getTopics(q._wsLevel, q.strand||q._wsStrand) || []).map(t =>
+                `<option value="${_esc(t)}" ${(q.topic||q._wsTopic)===t?"selected":""}>${_esc(t)}</option>`
+              ).join("")}
+            </select>
+          </div>
+        </div>
+
         ${hasDiagram ? `
           <div id="qb-edit-diagram-section">
             <label class="qb-edit-label">
@@ -593,13 +614,26 @@ function _showQEditModal(q) {
   document.getElementById("qb-edit-cancel")?.addEventListener("click", close);
   modal.addEventListener("click", e => { if (e.target === modal) close(); });
 
+  // Cascade: strand → topic
+  document.getElementById("qb-edit-strand")?.addEventListener("change", e => {
+    const topics   = getTopics(q._wsLevel, e.target.value) || [];
+    const topicSel = document.getElementById("qb-edit-topic");
+    if (!topicSel) return;
+    topicSel.innerHTML = `<option value="">— select —</option>` +
+      topics.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join("");
+  });
+
   if (hasDiagram) _setupCropCanvas(q.diagramImage);
 
   document.getElementById("qb-edit-save")?.addEventListener("click", () => {
     const textEl   = document.getElementById("qb-edit-text");
     const canvas   = document.getElementById("qb-crop-canvas");
-    const newText  = textEl?.value.trim() ?? q.text;
-    const newImage = canvas?.dataset.pendingCrop || null;
+    const strandEl = document.getElementById("qb-edit-strand");
+    const topicEl  = document.getElementById("qb-edit-topic");
+    const newText   = textEl?.value.trim()  ?? q.text;
+    const newStrand = strandEl?.value.trim() || "";
+    const newTopic  = topicEl?.value.trim()  || "";
+    const newImage  = canvas?.dataset.pendingCrop || null;
 
     const ws = getWorksheet(q._wsId);
     if (!ws) { alert("Worksheet not found."); return; }
@@ -609,7 +643,9 @@ function _showQEditModal(q) {
 
     ws.questions[qIdx] = {
       ...ws.questions[qIdx],
-      text: newText,
+      text:   newText,
+      strand: newStrand,
+      topic:  newTopic,
       ...(newImage ? { diagramImage: newImage } : {})
     };
 
