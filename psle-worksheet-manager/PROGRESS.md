@@ -92,9 +92,9 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 - [ ] **Score tracking** ([#6](https://github.com/xiegu/psle-worksheet-manager/issues/6)) — record student scores per worksheet per session
 
 ### Scraper improvements
-- [ ] Fix HTTP 406 on listing page ([#7](https://github.com/xiegu/psle-worksheet-manager/issues/7)) — add browser-like headers / cookie handling to auto-discover all available papers
-- [ ] Add `--years 2020-2025` range flag ([#8](https://github.com/xiegu/psle-worksheet-manager/issues/8)) — batch-scrape multiple years in one run
-- [ ] Support other subjects ([#9](https://github.com/xiegu/psle-worksheet-manager/issues/9)) — English, Science, Chinese; currently Maths only
+- [x] Fix HTTP 406 on listing page ([#7](https://github.com/xiegu/psle-worksheet-manager/issues/7)) — full browser-like headers (User-Agent, Accept, Accept-Language, Cache-Control) now sent on all listing page fetches
+- [x] Add `--years 2020-2025` range flag ([#8](https://github.com/xiegu/psle-worksheet-manager/issues/8)) — batch-scrape multiple years in one run; output file auto-named e.g. `p6-maths-prelim-2022-2025.json`
+- [x] Support other subjects ([#9](https://github.com/xiegu/psle-worksheet-manager/issues/9)) — `--subject Maths|English|Science|Chinese`; subject-aware URL patterns, extraction prompts, and default strand
 
 ---
 
@@ -115,4 +115,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-18 — GitHub repo created, 9 issues opened*
+*Last updated: 2026-03-21 — Scraper issues #7, #8, #9 implemented*
