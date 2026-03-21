@@ -214,6 +214,7 @@ function _htmlCard(ws) {
   const totalMarks  = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
   const qCount      = (ws.questions||[]).length;
   const isArchived  = ws.status === "archived";
+  const activeStu   = getActiveStudent();
 
   const diffBadgeClass = {
     Foundation: "badge-foundation",
@@ -229,6 +230,20 @@ function _htmlCard(ws) {
     ? `<span class="badge badge-archived">Archived</span>`
     : "";
 
+  // Taken badge — only when a student is active and the worksheet has questions
+  let takenBadge = "";
+  if (activeStu && qCount > 0) {
+    const takenSet  = new Set(activeStu.takenQuestions || []);
+    const takenCount = (ws.questions || []).filter(q => takenSet.has(ws.id + "::" + q.id)).length;
+    if (takenCount === qCount) {
+      takenBadge = `<span class="badge badge-ws-taken-all">&#10003; All taken</span>`;
+    } else if (takenCount > 0) {
+      takenBadge = `<span class="badge badge-ws-taken-partial">${takenCount}/${qCount} taken</span>`;
+    } else {
+      takenBadge = `<span class="badge badge-ws-taken-none">Not taken</span>`;
+    }
+  }
+
   return `
     <div class="ws-card ${isArchived?"ws-card--archived":""}" data-id="${_esc(ws.id)}">
       <div class="ws-card__header">
@@ -241,6 +256,7 @@ function _htmlCard(ws) {
         ${archivedBadge}
         ${ws.difficulty ? `<span class="badge ${diffBadgeClass}">${_esc(ws.difficulty)}</span>` : ""}
         ${ws.type ? `<span class="badge" style="background:var(--grey-200);color:var(--grey-800)">${_esc(ws.type)}</span>` : ""}
+        ${takenBadge}
       </div>
 
       <div class="ws-card__meta">
@@ -263,6 +279,17 @@ function _htmlCard(ws) {
           ? `<button class="btn btn-sm btn-card-unarchive" data-id="${_esc(ws.id)}">Restore</button>`
           : `<button class="btn btn-sm btn-danger btn-card-archive" data-id="${_esc(ws.id)}">Archive</button>`}
       </div>
+
+      ${activeStu ? (() => {
+        const latest = getScoresForWorksheet(activeStu.id, ws.id)[0];
+        const scoreDisplay = latest
+          ? `<div class="ws-card__score">Last: ${latest.score}/${latest.total} &bull; ${_esc(latest.date)}</div>`
+          : `<div class="ws-card__score ws-card__score--none">No score yet</div>`;
+        return `<div class="ws-card__score-section">
+          ${scoreDisplay}
+          <button class="btn btn-sm btn-card-score" data-id="${_esc(ws.id)}">Record Score</button>
+        </div>`;
+      })() : ""}
     </div>
   `;
 }
@@ -333,10 +360,11 @@ function _bindCardActions() {
     const id = btn.dataset.id;
 
     if (btn.classList.contains("btn-card-preview"))   { navigate("preview", { editingId: id }); return; }
-    if (btn.classList.contains("btn-card-edit"))      { _handleEdit(id);      return; }
-    if (btn.classList.contains("btn-card-duplicate")) { _handleDuplicate(id); return; }
-    if (btn.classList.contains("btn-card-archive"))   { _handleArchive(id);   return; }
-    if (btn.classList.contains("btn-card-unarchive")) { _handleUnarchive(id); return; }
+    if (btn.classList.contains("btn-card-edit"))      { _handleEdit(id);        return; }
+    if (btn.classList.contains("btn-card-duplicate")) { _handleDuplicate(id);   return; }
+    if (btn.classList.contains("btn-card-archive"))   { _handleArchive(id);     return; }
+    if (btn.classList.contains("btn-card-unarchive")) { _handleUnarchive(id);   return; }
+    if (btn.classList.contains("btn-card-score"))     { _handleRecordScore(id); return; }
   });
 }
 
@@ -390,6 +418,78 @@ function _handleUnarchive(id) {
   } catch (e) {
     showToast("Restore failed: " + e.message, "error");
   }
+}
+
+function _handleRecordScore(wsId) {
+  const ws  = getWorksheet(wsId);
+  const stu = getActiveStudent();
+  if (!ws || !stu) return;
+
+  const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
+
+  document.getElementById("score-modal")?.remove();
+
+  const modal = document.createElement("div");
+  modal.id        = "score-modal";
+  modal.className = "qb-modal-overlay";
+  modal.innerHTML = `
+    <div class="qb-modal" role="dialog" aria-modal="true" style="max-width:400px;width:90vw">
+      <div class="qb-modal__header">
+        <div style="font-weight:700;font-size:15px">Record Score</div>
+        <button class="qb-modal__close" id="score-modal-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="qb-modal__body score-form">
+        <div style="margin-bottom:12px;font-size:13px;color:var(--grey-600)">${_esc(ws.title || "Untitled")} &mdash; ${_esc(stu.name)}</div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label>Total Marks</label>
+          <input type="number" id="score-total" value="${totalMarks}" min="1" />
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label>Marks Obtained</label>
+          <input type="number" id="score-obtained" min="0" placeholder="e.g. 85" />
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" id="score-date" value="${new Date().toISOString().slice(0,10)}" />
+        </div>
+      </div>
+      <div class="qb-modal__footer">
+        <button class="btn btn-primary" id="score-modal-save">Save</button>
+        <button class="btn"             id="score-modal-cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  document.getElementById("score-modal-close")?.addEventListener("click",  close);
+  document.getElementById("score-modal-cancel")?.addEventListener("click", close);
+  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+
+  document.getElementById("score-modal-save")?.addEventListener("click", () => {
+    const obtainedVal = document.getElementById("score-obtained")?.value;
+    const totalVal    = document.getElementById("score-total")?.value;
+    const date        = document.getElementById("score-date")?.value || new Date().toISOString().slice(0,10);
+
+    const obtained = parseInt(obtainedVal);
+    const total    = parseInt(totalVal);
+
+    if (isNaN(obtained) || obtained < 0) { showToast("Enter a valid score.", "error"); return; }
+    if (isNaN(total) || total < 1)       { showToast("Total marks must be at least 1.", "error"); return; }
+
+    recordScore(stu.id, wsId, obtained, total, date);
+
+    // Mark all questions in this worksheet as taken
+    const qKeys = (ws.questions || []).map(q => ws.id + "::" + q.id);
+    markQuestionsTaken(stu.id, qKeys);
+
+    close();
+    _renderGrid();
+    showToast("Score recorded.", "success");
+  });
+
+  document.getElementById("score-obtained")?.focus();
 }
 
 function _handlePrint(id) {

@@ -208,3 +208,133 @@ function importAll(jsonString) {
 function clearAll() {
   localStorage.removeItem(STORAGE_KEY);
 }
+
+// ---------------------------------------------------------------------------
+// Student CRUD helpers
+// ---------------------------------------------------------------------------
+
+const STUDENTS_KEY      = "psle_students";
+const ACTIVE_STUDENT_KEY = "psle_active_student";
+
+function _loadStudents() {
+  try {
+    const raw = localStorage.getItem(STUDENTS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error("storage: failed to parse students data", e);
+    return [];
+  }
+}
+
+function _saveStudents(arr) {
+  try {
+    localStorage.setItem(STUDENTS_KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.error("storage: failed to write students", e);
+    throw new Error("Could not save students — storage may be full.");
+  }
+}
+
+/** @returns {object[]} All students sorted by name */
+function getAllStudents() {
+  return _loadStudents().sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** @returns {object|null} */
+function getStudent(id) {
+  if (!id) return null;
+  return _loadStudents().find(s => s.id === id) || null;
+}
+
+/**
+ * Create or update a student.
+ * @param {object} student
+ * @returns {object} saved student
+ */
+function saveStudent(student) {
+  const students = _loadStudents();
+  const now = _today();
+
+  if (student.id) {
+    const idx = students.findIndex(s => s.id === student.id);
+    if (idx !== -1) {
+      students[idx] = { ...students[idx], ...student };
+      _saveStudents(students);
+      return students[idx];
+    }
+  }
+
+  // New student
+  const created = {
+    name: "",
+    takenQuestions: [],
+    scores: [],
+    ...student,
+    id: "stu_" + Date.now(),
+    createdAt: now
+  };
+  students.push(created);
+  _saveStudents(students);
+  return created;
+}
+
+/** @returns {boolean} */
+function deleteStudent(id) {
+  const students = _loadStudents();
+  const idx = students.findIndex(s => s.id === id);
+  if (idx === -1) return false;
+  students.splice(idx, 1);
+  _saveStudents(students);
+  return true;
+}
+
+/** @returns {string|null} */
+function getActiveStudentId() {
+  return localStorage.getItem(ACTIVE_STUDENT_KEY) || null;
+}
+
+function setActiveStudentId(id) {
+  if (id) localStorage.setItem(ACTIVE_STUDENT_KEY, id);
+  else    localStorage.removeItem(ACTIVE_STUDENT_KEY);
+}
+
+/** @returns {object|null} */
+function getActiveStudent() {
+  return getStudent(getActiveStudentId());
+}
+
+/**
+ * Append composite keys to a student's takenQuestions (deduped).
+ * @param {string} studentId
+ * @param {string[]} keys  e.g. ["wsId::qId", ...]
+ */
+function markQuestionsTaken(studentId, keys) {
+  const student = getStudent(studentId);
+  if (!student) return;
+  const existing = new Set(student.takenQuestions || []);
+  keys.forEach(k => existing.add(k));
+  student.takenQuestions = Array.from(existing);
+  saveStudent(student);
+}
+
+/**
+ * Push a score entry to a student's scores array.
+ */
+function recordScore(studentId, wsId, score, total, date) {
+  const student = getStudent(studentId);
+  if (!student) return;
+  if (!student.scores) student.scores = [];
+  student.scores.push({ wsId, score, total, date });
+  saveStudent(student);
+}
+
+/**
+ * @returns {object[]} Score entries for a given worksheet, newest first.
+ */
+function getScoresForWorksheet(studentId, wsId) {
+  const student = getStudent(studentId);
+  if (!student) return [];
+  return (student.scores || [])
+    .filter(s => s.wsId === wsId)
+    .sort((a, b) => b.date.localeCompare(a.date));
+}

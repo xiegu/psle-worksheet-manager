@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PSLE 2026 Worksheet Manager</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=2" />
 </head>
 <body>
 
@@ -30,9 +30,11 @@
       <button class="nav-btn" data-view="questionbank">
         <span class="nav-icon">&#10067;</span> Question Bank
       </button>
+      <button class="nav-btn" data-view="students">&#128100; Students</button>
     </nav>
 
     <div class="app-header__actions">
+      <div id="active-student-indicator"></div>
       <button class="icon-btn" id="btn-export" title="Export backup">&#8595; Export</button>
       <button class="icon-btn" id="btn-import" title="Import backup">&#8593; Import</button>
       <input type="file" id="import-file-input" accept=".json" style="display:none" />
@@ -54,13 +56,14 @@
   <!-- =====================================================================
        Scripts — order matters: data → storage → modules → router
   ====================================================================== -->
-  <script src="data/syllabus.js"></script>
-  <script src="modules/storage.js"></script>
-  <script src="modules/library.js"></script>
-  <script src="modules/builder.js"></script>
-  <script src="modules/preview.js"></script>
-  <script src="modules/questionbank.js"></script>
-  <script src="app.js"></script>
+  <script src="data/syllabus.js?v=2"></script>
+  <script src="modules/storage.js?v=2"></script>
+  <script src="modules/students.js?v=2"></script>
+  <script src="modules/library.js?v=2"></script>
+  <script src="modules/builder.js?v=2"></script>
+  <script src="modules/preview.js?v=2"></script>
+  <script src="modules/questionbank.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 
 </body>
 </html>

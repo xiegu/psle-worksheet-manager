@@ -11,7 +11,8 @@ let _qbFilters = {
   strand:     "",
   topic:      "",
   difficulty: "",
-  qtype:      ""   // "mcq" | "short_answer" | "long_answer"
+  qtype:      "",  // "mcq" | "short_answer" | "long_answer"
+  hideTaken:  false
 };
 
 let _selected = new Set(); // set of composite keys "wsId::qId"
@@ -158,6 +159,12 @@ function _htmlQBFilterBar() {
         </select>
       </div>
 
+      ${getActiveStudent() ? `
+      <div class="filter-group filter-group--toggle">
+        <label for="qbf-hide-taken">Hide Taken</label>
+        <input type="checkbox" id="qbf-hide-taken" ${_qbFilters.hideTaken ? "checked" : ""} />
+      </div>` : ""}
+
       <button class="filter-reset" id="qbf-reset">Reset</button>
     </div>
   `;
@@ -168,12 +175,16 @@ function _htmlQBFilterBar() {
 // ---------------------------------------------------------------------------
 
 function _applyQBFilters(allQ) {
+  const stu      = _qbFilters.hideTaken ? getActiveStudent() : null;
+  const takenSet = stu ? new Set(stu.takenQuestions || []) : null;
+
   return allQ.filter(q => {
     if (_qbFilters.level      && q._wsLevel      !== _qbFilters.level)      return false;
     if (_qbFilters.strand     && q._wsStrand     !== _qbFilters.strand)     return false;
     if (_qbFilters.topic      && q._wsTopic      !== _qbFilters.topic)      return false;
     if (_qbFilters.difficulty && q._wsDifficulty !== _qbFilters.difficulty) return false;
     if (_qbFilters.qtype      && q.type          !== _qbFilters.qtype)      return false;
+    if (takenSet              && takenSet.has(q._key))                       return false;
     return true;
   });
 }
@@ -214,6 +225,10 @@ function _renderQBGrid() {
   const allQ     = _getAllEnrichedQuestions();
   const filtered = _applyQBFilters(allQ);
 
+  // Compute taken set once for badge rendering
+  const stu      = getActiveStudent();
+  const takenSet = stu ? new Set(stu.takenQuestions || []) : new Set();
+
   selBar.innerHTML = _htmlSelectionBar(filtered.length);
   _bindSelectionBar(filtered);
 
@@ -230,7 +245,7 @@ function _renderQBGrid() {
     return;
   }
 
-  wrap.innerHTML = `<div class="qb-grid">${filtered.map(q => _htmlQCard(q)).join("")}</div>`;
+  wrap.innerHTML = `<div class="qb-grid">${filtered.map(q => _htmlQCard(q, takenSet)).join("")}</div>`;
   _bindQBCardActions();
 }
 
@@ -238,7 +253,7 @@ function _renderQBGrid() {
 // Question card HTML
 // ---------------------------------------------------------------------------
 
-function _htmlQCard(q) {
+function _htmlQCard(q, takenSet) {
   const qtypeLabel = {
     mcq:          "MCQ",
     short_answer: "Short",
@@ -260,6 +275,9 @@ function _htmlQCard(q) {
   const archivedBadge = q._wsStatus === "archived"
     ? `<span class="badge badge-archived" style="font-size:9px">Archived</span>`
     : "";
+  const takenBadge = takenSet && takenSet.has(q._key)
+    ? `<span class="badge badge-taken">Taken</span>`
+    : "";
 
   const shortText = q.text.length > 130 ? q.text.slice(0, 130) + "…" : q.text;
 
@@ -279,6 +297,7 @@ function _htmlQCard(q) {
         <span class="qb-card__marks">${q.marks || 1}m</span>
         <div style="flex:1"></div>
         ${q._wsLevel ? `<span class="badge badge-level" style="font-size:10px">${_esc(q._wsLevel)}</span>` : ""}
+        ${takenBadge}
         ${archivedBadge}
       </div>
 
@@ -329,8 +348,13 @@ function _bindQBFilters() {
     });
   });
 
+  document.getElementById("qbf-hide-taken")?.addEventListener("change", e => {
+    _qbFilters.hideTaken = e.target.checked;
+    _renderQBGrid();
+  });
+
   document.getElementById("qbf-reset")?.addEventListener("click", () => {
-    _qbFilters = { level:"", strand:"", topic:"", difficulty:"", qtype:"" };
+    _qbFilters = { level:"", strand:"", topic:"", difficulty:"", qtype:"", hideTaken: false };
     _rebuildQBFilterBar();
   });
 }
@@ -354,6 +378,7 @@ function _bindSelectionBar(filtered) {
   });
 
   document.getElementById("btn-build-from-bank")?.addEventListener("click", () => {
+    _markSelectedTaken();
     _buildFromSelected();
   });
 
@@ -385,6 +410,7 @@ function _bindQBCardActions() {
     if (btn.classList.contains("qb-btn-use")) {
       _selected.clear();
       _selected.add(key);
+      _markSelectedTaken();
       _buildFromSelected();
       return;
     }
@@ -399,6 +425,16 @@ function _bindQBCardActions() {
       return;
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Mark selected questions as taken (called before building)
+// ---------------------------------------------------------------------------
+
+function _markSelectedTaken() {
+  const stu = getActiveStudent();
+  if (!stu || _selected.size === 0) return;
+  markQuestionsTaken(stu.id, Array.from(_selected));
 }
 
 // ---------------------------------------------------------------------------
@@ -523,6 +559,7 @@ function _showQPreviewModal(q) {
     close();
     _selected.clear();
     _selected.add(q._key);
+    _markSelectedTaken();
     _buildFromSelected();
   });
 

@@ -38,6 +38,8 @@ function navigate(view, params = {}) {
     renderPreview(main, AppState.editingId);
   } else if (view === "questionbank") {
     renderQuestionBank(main);
+  } else if (view === "students") {
+    renderStudents(main);
   }
 
   // Scroll to top on navigation
@@ -125,6 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   initExportImport();
+  renderActiveStudentIndicator();
 
   // Start on library view
   navigate("library");
