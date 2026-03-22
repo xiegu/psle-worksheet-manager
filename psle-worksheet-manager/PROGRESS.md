@@ -36,7 +36,7 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 ## GitHub
 
 - **Repo:** https://github.com/xiegu/psle-worksheet-manager (public)
-- **Issues:** 9 open issues tracking all remaining work — labelled `priority: high`, `enhancement`, `scraper`, `manual`
+- **Issues:** 19 open issues tracking all remaining work — labelled `priority: high`, `bug`, `security`, `enhancement`, `code-quality`, `accessibility`, `print`, `scraper`
 
 ---
 
@@ -94,23 +94,38 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 ## Next Steps
 
-### High priority (GitHub Issues #1–#3)
+### Critical — bugs & security (GitHub Issues #10–#12)
+- [ ] **Fix race condition in student cache + null checks** ([#10](https://github.com/xiegu/psle-worksheet-manager/issues/10)) — student cache desync, missing null guards, export error handling
+- [ ] **Fix question ID collisions** ([#11](https://github.com/xiegu/psle-worksheet-manager/issues/11)) — QB→builder merge can produce duplicate `q1`, `q2` IDs
+- [ ] **XSS risk in imported data** ([#12](https://github.com/xiegu/psle-worksheet-manager/issues/12)) — sanitize imported JSON, whitelist diagram MIME types
+
+### High priority (GitHub Issues #1, #3, #14, #21)
 - [ ] **Rotate API key** ([#1](https://github.com/xiegu/psle-worksheet-manager/issues/1)) — revoke old key at `platform.claude.com/settings/api-keys`
-- [ ] **Assign topics after import** ([#2](https://github.com/xiegu/psle-worksheet-manager/issues/2)) — open Nanyang paper in Edit, set Strand + Topic so library filters work
 - [ ] **Scrape more papers** ([#3](https://github.com/xiegu/psle-worksheet-manager/issues/3)) — run scraper for other schools, years, and levels (P5, P4)
+- [ ] **Prevent duplicate score recording** ([#14](https://github.com/xiegu/psle-worksheet-manager/issues/14)) — warn on duplicate, validate score range
+- [ ] **Fix drag-drop index validation** ([#21](https://github.com/xiegu/psle-worksheet-manager/issues/21)) — bounds check + archive error handling
 
-### Nice to have
-- [x] **In-app Question Bank** — browse all questions across worksheets; filter by Level/Strand/Topic/Q-Type/Difficulty; multi-select + "Build Worksheet"; single-question "Use" and "Preview" with answer key
-- [x] **Diagram support** — scraper converts PDF pages to JPEG via `pdftoppm`; Claude returns `diagramBbox` coordinates; `sharp` crops each figure to a tight JPEG stored as `diagramImage` on the question; diagrams display in Preview, print, builder card, builder live preview, and Question Bank modal
-- [x] **GitHub + issue tracking** — repo at github.com/xiegu/psle-worksheet-manager; all remaining tasks tracked as issues
-- [ ] **Batch print** ([#4](https://github.com/xiegu/psle-worksheet-manager/issues/4)) — print multiple worksheets in one browser print session (page-break CSS already in place)
-- [ ] **Answer key page** ([#5](https://github.com/xiegu/psle-worksheet-manager/issues/5)) — separate printable answer key sheet rather than bottom-of-page table
-- [x] **Student module + score tracking** ([#6](https://github.com/xiegu/psle-worksheet-manager/issues/6)) — full student management, taken-question tracking, score recording per worksheet
+### Enhancements (GitHub Issues #4, #5, #13, #15–#20, #22–#24)
+- [ ] **Batch print** ([#4](https://github.com/xiegu/psle-worksheet-manager/issues/4)) — print multiple worksheets in one browser print session
+- [ ] **Separate answer key sheet** ([#5](https://github.com/xiegu/psle-worksheet-manager/issues/5)) — printable answer key on its own page
+- [ ] **Deduplicate `_esc()` helper** ([#13](https://github.com/xiegu/psle-worksheet-manager/issues/13)) — shared utility instead of 5 copies
+- [ ] **Print output improvements** ([#15](https://github.com/xiegu/psle-worksheet-manager/issues/15)) — logo fallback, text overflow, page break orphans, diagram size limit
+- [ ] **Accessibility** ([#16](https://github.com/xiegu/psle-worksheet-manager/issues/16)) — keyboard nav, ARIA labels, Enter-to-submit
+- [ ] **Text search + pagination** ([#17](https://github.com/xiegu/psle-worksheet-manager/issues/17)) — search in Library, paginate Question Bank
+- [ ] **Undo/redo + touch reorder** ([#18](https://github.com/xiegu/psle-worksheet-manager/issues/18)) — builder undo stack, touch drag support
+- [ ] **Bulk operations** ([#19](https://github.com/xiegu/psle-worksheet-manager/issues/19)) — multi-select archive, delete, assign topic
+- [ ] **Taken question timestamps** ([#20](https://github.com/xiegu/psle-worksheet-manager/issues/20)) — track when questions were taken
+- [ ] **Focus management** ([#22](https://github.com/xiegu/psle-worksheet-manager/issues/22)) — preserve focus on filter rebuild
+- [ ] **QB performance** ([#23](https://github.com/xiegu/psle-worksheet-manager/issues/23)) — cache enriched questions, reduce re-fetches
+- [ ] **Multi-subject titles** ([#24](https://github.com/xiegu/psle-worksheet-manager/issues/24)) — subject field in worksheet schema
 
-### Scraper improvements
-- [x] Fix HTTP 406 on listing page ([#7](https://github.com/xiegu/psle-worksheet-manager/issues/7)) — full browser-like headers (User-Agent, Accept, Accept-Language, Cache-Control) now sent on all listing page fetches
-- [x] Add `--years 2020-2025` range flag ([#8](https://github.com/xiegu/psle-worksheet-manager/issues/8)) — batch-scrape multiple years in one run; output file auto-named e.g. `p6-maths-prelim-2022-2025.json`
-- [x] Support other subjects ([#9](https://github.com/xiegu/psle-worksheet-manager/issues/9)) — `--subject Maths|English|Science|Chinese`; subject-aware URL patterns, extraction prompts, and default strand
+### Completed
+- [x] **Assign topics after import** ([#2](https://github.com/xiegu/psle-worksheet-manager/issues/2))
+- [x] **Student module + score tracking** ([#6](https://github.com/xiegu/psle-worksheet-manager/issues/6))
+- [x] **Fix HTTP 406 on listing page** ([#7](https://github.com/xiegu/psle-worksheet-manager/issues/7))
+- [x] **Add `--years` range flag** ([#8](https://github.com/xiegu/psle-worksheet-manager/issues/8))
+- [x] **Support other subjects in scraper** ([#9](https://github.com/xiegu/psle-worksheet-manager/issues/9))
+- [x] In-app Question Bank, Diagram support, GitHub + issue tracking
 
 ---
 
@@ -131,5 +146,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-22 — IndexedDB migration; scraper cost optimisations*
-*Updated: 2026-03-22 — 4-tab library (source papers vs worksheets); origin tagging + migration; logo in print output; diagram fix in QB→builder flow; QB taken dropdown; builder "Pick from QB" modal; archived papers Recover/Delete; taken badge logic split by origin*
+*Last updated: 2026-03-22 — code review; 15 new issues (#10–#24) created for bugs, security, UX, accessibility, and code quality improvements*
