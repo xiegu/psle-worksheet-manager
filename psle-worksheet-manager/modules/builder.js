@@ -359,6 +359,11 @@ function _esc(str) {
     .replace(/"/g,"&quot;");
 }
 
+/** Generate a collision-resistant question ID */
+function _newQId() {
+  return "q_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+}
+
 // ---------------------------------------------------------------------------
 // Cascading dropdowns
 // ---------------------------------------------------------------------------
@@ -475,7 +480,7 @@ function _bindQuestions() {
 
   // Add blank question
   document.getElementById("btn-add-question")?.addEventListener("click", () => {
-    _questions.push({ id: "q" + Date.now(), type: "short_answer", text: "", marks: 1, answer: "", working: "" });
+    _questions.push({ id: _newQId(), type: "short_answer", text: "", marks: 1, answer: "", working: "" });
     _rerenderQuestions();
   });
 
@@ -589,7 +594,7 @@ function _bindActionBar() {
 
     const ws = {
       ..._draft,
-      questions: _questions.map((q, i) => ({ ...q, id: q.id || "q" + (i+1) }))
+      questions: _questions.map(q => ({ ...q, id: q.id || _newQId() }))
     };
 
     try {
@@ -816,7 +821,7 @@ async function _showQBPickerModal() {
     const toAdd = allQ.filter(q => pickedKeys.has(q._key));
     toAdd.forEach(q => {
       const newQ = {
-        id:      "q" + Date.now() + Math.random(),
+        id:      _newQId(),
         type:    q.type,
         text:    q.text,
         marks:   q.marks,

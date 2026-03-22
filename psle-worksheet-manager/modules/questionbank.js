@@ -456,9 +456,9 @@ async function _buildFromSelected() {
   const selectedQ = allQ.filter(q => _selected.has(q._key));
 
   // Strip internal _ws* fields and assign fresh IDs
-  const questions = selectedQ.map((q, i) => {
+  const questions = selectedQ.map(q => {
     const clean = {
-      id:      "q" + (Date.now() + i),
+      id:      "q_" + Date.now() + "_" + Math.floor(Math.random() * 1e6),
       type:    q.type,
       text:    q.text,
       marks:   q.marks,

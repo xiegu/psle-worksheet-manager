@@ -479,7 +479,7 @@ async function _handleDuplicate(id) {
     ...ws,
     id: undefined, title: "Copy of " + ws.title,
     status: "active", version: 1, createdAt: undefined, updatedAt: undefined,
-    questions: (ws.questions||[]).map(q => ({ ...q, id: "q" + Date.now() + Math.random() }))
+    questions: (ws.questions||[]).map(q => ({ ...q, id: "q_" + Date.now() + "_" + Math.floor(Math.random() * 1e6) }))
   };
   try {
     await saveWorksheet(copy);

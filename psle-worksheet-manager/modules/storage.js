@@ -235,19 +235,36 @@ async function unarchiveWorksheet(id) {
 
 /** Triggers a browser download of all data as a JSON backup file. */
 async function exportAll() {
-  const data = {
-    exportedAt: new Date().toISOString(),
-    version:    2,
-    worksheets: await getAllWorksheets(),
-    students:   await getAllStudents()
-  };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement("a");
-  a.href     = url;
-  a.download = "psle-worksheets-backup-" + _today() + ".json";
-  a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const data = {
+      exportedAt: new Date().toISOString(),
+      version:    2,
+      worksheets: await getAllWorksheets(),
+      students:   await getAllStudents()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = "psle-worksheets-backup-" + _today() + ".json";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    throw new Error("Export failed: " + e.message);
+  }
+}
+
+/**
+ * Allow only JPEG/PNG data URIs for diagram images.
+ * Rejects javascript: URIs, SVG data URIs, or anything unexpected.
+ * @param {*} val
+ * @returns {string|null}
+ */
+function _sanitizeDiagramImage(val) {
+  if (!val || typeof val !== "string") return null;
+  if (val.startsWith("data:image/jpeg;base64,") ||
+      val.startsWith("data:image/png;base64,"))  return val;
+  return null;
 }
 
 /**
@@ -274,8 +291,18 @@ async function importAll(jsonString) {
 
   let imported = 0, skipped = 0;
   for (const ws of incoming) {
-    if (!ws.id || !ws.title) { skipped++; continue; }
-    existingMap.set(ws.id, { origin: "imported", ...ws });
+    if (!ws.id || typeof ws.id !== "string")    { skipped++; continue; }
+    if (!ws.title || typeof ws.title !== "string") { skipped++; continue; }
+    // Sanitize diagram images — reject anything that isn't a plain JPEG/PNG data URI
+    const questions = (Array.isArray(ws.questions) ? ws.questions : []).map(q => {
+      if (!q || typeof q !== "object") return null;
+      const clean = { ...q };
+      const img = _sanitizeDiagramImage(q.diagramImage);
+      if (img) clean.diagramImage = img;
+      else     delete clean.diagramImage;
+      return clean;
+    }).filter(Boolean);
+    existingMap.set(ws.id, { origin: "imported", ...ws, questions });
     imported++;
   }
 
@@ -378,12 +405,18 @@ function getActiveStudentId() {
 
 /**
  * Set (or clear) the active student. Updates localStorage and memory cache.
+ * Guards against race conditions: if two calls overlap, only the last caller
+ * writes to the cache (checked by re-reading localStorage after the await).
  * @returns {Promise<void>}
  */
 async function setActiveStudentId(id) {
   if (id) {
     localStorage.setItem(ACTIVE_STUDENT_KEY, id);
-    _cachedActiveStudent = await getStudent(id);
+    const stu = await getStudent(id);
+    // Only update the cache if this call is still the most-recent one
+    if (localStorage.getItem(ACTIVE_STUDENT_KEY) === id) {
+      _cachedActiveStudent = stu;
+    }
   } else {
     localStorage.removeItem(ACTIVE_STUDENT_KEY);
     _cachedActiveStudent = null;
