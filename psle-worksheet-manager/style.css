@@ -185,6 +185,58 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 /* -------------------------------------------------------------------------
+   Library tab bar
+------------------------------------------------------------------------- */
+.lib-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px;
+}
+
+.lib-tab {
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--grey-100);
+  color: var(--grey-600);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  margin-bottom: -2px;
+  transition: background 0.1s, color 0.1s;
+}
+
+.lib-tab:hover {
+  background: var(--grey-200);
+  color: var(--grey-800);
+}
+
+.lib-tab.active {
+  background: #fff;
+  color: var(--blue);
+  font-weight: 700;
+  border-color: var(--border);
+  border-bottom-color: #fff;
+}
+
+.lib-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.lib-tab-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+/* -------------------------------------------------------------------------
    Filter bar (library)
 ------------------------------------------------------------------------- */
 .filter-bar {
@@ -841,6 +893,54 @@ button { cursor: pointer; font-family: inherit; }
   display: flex;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------------------
+   Builder — QB picker modal items
+------------------------------------------------------------------------- */
+.builder-qb-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.builder-qb-item:hover { background: var(--grey-100); }
+
+.builder-qb-item--selected {
+  border-color: var(--blue);
+  background: var(--blue-light);
+}
+
+.builder-qb-item input[type="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.builder-qb-item__content { flex: 1; min-width: 0; }
+
+.builder-qb-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--grey-600);
+  margin-bottom: 4px;
+}
+
+.builder-qb-item__text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
 }
 
 /* -------------------------------------------------------------------------

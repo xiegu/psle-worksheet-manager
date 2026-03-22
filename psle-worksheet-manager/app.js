@@ -109,10 +109,36 @@ window.showToast = showToast;
 window.navigate  = navigate;
 
 // ---------------------------------------------------------------------------
+// Logo loader — converts logo.png to a base64 data URL for use in print windows
+// ---------------------------------------------------------------------------
+
+function _loadLogoDataUrl() {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width  = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        canvas.getContext("2d").drawImage(img, 0, 0);
+        resolve(canvas.toDataURL("image/png"));
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = "logo.png";
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Boot
 // ---------------------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", async () => {
+  // Load logo as base64 data URL so it works in print windows (blank tab, no base URL)
+  window.LOGO_DATA_URL = await _loadLogoDataUrl();
+
   // Initialise IndexedDB (opens DB, migrates legacy localStorage data, primes cache)
   try {
     await initDB();

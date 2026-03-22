@@ -1,20 +1,18 @@
 // modules/library.js
-// Worksheet library dashboard — stats bar, filter bar, card grid.
-// Exported entry point: renderLibrary(container)
+// Worksheet library — tab view with 4 tabs:
+//   "worksheets"      Active Worksheets   (origin:"built",    status:active)
+//   "papers"          Available Papers    (origin:"imported", status:active)
+//   "archived-ws"     Archived Worksheets (origin:"built",    status:archived)
+//   "archived-papers" Archived Papers     (origin:"imported", status:archived)
+// Entry point: renderLibrary(container)
 
 // ---------------------------------------------------------------------------
-// Filter state — persists across re-renders within the same session
+// Module state — persists within session
 // ---------------------------------------------------------------------------
 
-let _filters = {
-  level:      "",
-  strand:     "",
-  topic:      "",
-  difficulty: "",
-  type:       "",
-  status:     "active",   // default: show active worksheets
-  flag:       ""
-};
+let _wsFilters    = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
+let _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
+let _activeTab    = "worksheets";
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -23,198 +21,268 @@ let _filters = {
 async function renderLibrary(container) {
   const all = await getAllWorksheets();
 
+  // Counts for tab labels and stats bar
+  const counts = _getCounts(all);
+
   container.innerHTML = `
-    ${_htmlStatsBar(all)}
-    ${_htmlFilterBar()}
-    <div id="card-grid-wrap"></div>
+    <div id="lib-wrap">
+      ${_htmlStatsBar(counts)}
+      ${_htmlTabBar(counts)}
+      <div id="lib-tab-content"></div>
+    </div>
   `;
 
-  _bindFilters();
-  await _renderGrid();
+  // Fill the active tab content structure, then bind, then render grid
+  document.getElementById("lib-tab-content").innerHTML = _htmlTabContent(_activeTab);
+  _bindLibrary();
+  await _renderTabGrid(_activeTab, all);
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function _getCounts(all) {
+  return {
+    ws:      all.filter(w => w.origin !== "imported" && w.status !== "archived").length,
+    papers:  all.filter(w => w.origin === "imported" && w.status !== "archived").length,
+    archWs:  all.filter(w => w.origin !== "imported" && w.status === "archived").length,
+    archPp:  all.filter(w => w.origin === "imported" && w.status === "archived").length
+  };
+}
+
+async function _rerenderLibrary() {
+  const main = document.getElementById("app-main");
+  if (!main) return;
+  main.innerHTML = "";
+  await renderLibrary(main);
 }
 
 // ---------------------------------------------------------------------------
 // Stats bar
 // ---------------------------------------------------------------------------
 
-function _htmlStatsBar(all) {
-  const active   = all.filter(w => w.status !== "archived");
-  const archived = all.filter(w => w.status === "archived");
-
-  const byLevel = ["P1","P2","P3","P4","P5","P6"].map(l => {
-    const count = active.filter(w => w.level === l).length;
-    return count > 0
-      ? `<span class="badge badge-level" style="font-size:11px">${l}: ${count}</span>`
-      : "";
-  }).filter(Boolean).join(" ");
-
-  const lastUpdated = active.length > 0
-    ? active.sort((a,b) => b.updatedAt.localeCompare(a.updatedAt))[0].updatedAt
-    : "—";
-
+function _htmlStatsBar({ ws, papers, archWs, archPp }) {
   return `
     <div class="stats-bar">
       <div class="stat-card">
-        <div class="stat-card__value">${active.length}</div>
+        <div class="stat-card__value">${ws}</div>
         <div class="stat-card__label">Active Worksheets</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card__value">${archived.length}</div>
-        <div class="stat-card__label">Archived</div>
-      </div>
-      <div class="stat-card" style="flex:2">
-        <div class="stat-card__label" style="margin-bottom:6px">By Level</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">
-          ${byLevel || '<span style="color:var(--grey-400);font-size:12px">No worksheets yet</span>'}
-        </div>
+        <div class="stat-card__value">${papers}</div>
+        <div class="stat-card__label">Available Papers</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card__value" style="font-size:14px">${lastUpdated}</div>
-        <div class="stat-card__label">Last Updated</div>
+        <div class="stat-card__value">${archWs}</div>
+        <div class="stat-card__label">Archived Worksheets</div>
       </div>
-      <div class="stat-card" style="display:flex;align-items:center">
-        <button class="btn btn-primary" id="btn-new-from-library">+ New Worksheet</button>
+      <div class="stat-card">
+        <div class="stat-card__value">${archPp}</div>
+        <div class="stat-card__label">Archived Papers</div>
       </div>
     </div>
   `;
 }
 
 // ---------------------------------------------------------------------------
-// Filter bar
+// Tab bar
 // ---------------------------------------------------------------------------
 
-function _htmlFilterBar() {
-  const levels      = ["P1","P2","P3","P4","P5","P6"];
-  const strands     = _filters.level ? getStrands(_filters.level) : [];
-  const topics      = (_filters.level && _filters.strand)
-                        ? getTopics(_filters.level, _filters.strand) : [];
+function _htmlTabBar({ ws, papers, archWs, archPp }) {
+  const tabs = [
+    { id: "worksheets",      label: "Active Worksheets",   count: ws      },
+    { id: "papers",          label: "Available Papers",    count: papers  },
+    { id: "archived-ws",     label: "Archived Worksheets", count: archWs  },
+    { id: "archived-papers", label: "Archived Papers",     count: archPp  }
+  ];
+  return `
+    <div class="lib-tabs">
+      ${tabs.map(t => `
+        <button class="lib-tab ${_activeTab === t.id ? "active" : ""}" data-tab="${t.id}">
+          ${t.label} <span class="lib-count">(${t.count})</span>
+        </button>`).join("")}
+    </div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// Tab content structure (filter bars + grid placeholder divs)
+// ---------------------------------------------------------------------------
+
+function _htmlTabContent(tab) {
+  if (tab === "worksheets") return `
+    <div class="lib-tab-actions">
+      <button class="btn btn-primary" id="btn-new-from-library">+ New Worksheet</button>
+    </div>
+    <div id="filter-wrap-ws">${_htmlFilterBar("ws", _wsFilters)}</div>
+    <div id="grid-active-ws"></div>
+  `;
+  if (tab === "papers") return `
+    <div id="filter-wrap-paper">${_htmlFilterBar("paper", _paperFilters)}</div>
+    <div id="grid-active-papers"></div>
+  `;
+  if (tab === "archived-ws")     return `<div id="grid-archived-ws"></div>`;
+  if (tab === "archived-papers") return `<div id="grid-archived-papers"></div>`;
+  return "";
+}
+
+// ---------------------------------------------------------------------------
+// Filter bar (shared template, prefix = "ws" | "paper")
+// ---------------------------------------------------------------------------
+
+function _htmlFilterBar(prefix, filters) {
+  const levels       = ["P1","P2","P3","P4","P5","P6"];
+  const strands      = filters.level ? getStrands(filters.level) : [];
+  const topics       = (filters.level && filters.strand)
+                         ? getTopics(filters.level, filters.strand) : [];
   const difficulties = ["Foundation","Standard","Challenge"];
   const types        = ["Practice","Word Problem","Mixed","Exam-style"];
-  const flags        = [
-    { value: "new",        label: "New 2026"    },
-    { value: "moved_up",   label: "Moved up"    },
-    { value: "moved_down", label: "Moved down"  }
+  const flagOpts     = [
+    { value:"new",        label:"New 2026"   },
+    { value:"moved_up",   label:"Moved up"   },
+    { value:"moved_down", label:"Moved down" }
   ];
+  const p = `fil-${prefix}`;
 
   return `
     <div class="filter-bar">
       <div class="filter-group">
         <label>Level</label>
-        <select id="fil-level">
+        <select id="${p}-level">
           <option value="">All</option>
-          ${levels.map(l => `<option value="${l}" ${_filters.level===l?"selected":""}>${l}</option>`).join("")}
+          ${levels.map(l =>
+            `<option value="${l}" ${filters.level===l?"selected":""}>${l}</option>`
+          ).join("")}
         </select>
       </div>
-
       <div class="filter-group">
         <label>Strand</label>
-        <select id="fil-strand" ${!strands.length?"disabled":""}>
+        <select id="${p}-strand" ${!strands.length?"disabled":""}>
           <option value="">All</option>
-          ${strands.map(s => `<option value="${_esc(s)}" ${_filters.strand===s?"selected":""}>${_esc(s)}</option>`).join("")}
+          ${strands.map(s =>
+            `<option value="${_esc(s)}" ${filters.strand===s?"selected":""}>${_esc(s)}</option>`
+          ).join("")}
         </select>
       </div>
-
       <div class="filter-group">
         <label>Topic</label>
-        <select id="fil-topic" ${!topics.length?"disabled":""}>
+        <select id="${p}-topic" ${!topics.length?"disabled":""}>
           <option value="">All</option>
-          ${topics.map(t => `<option value="${_esc(t)}" ${_filters.topic===t?"selected":""}>${_esc(t)}</option>`).join("")}
+          ${topics.map(t =>
+            `<option value="${_esc(t)}" ${filters.topic===t?"selected":""}>${_esc(t)}</option>`
+          ).join("")}
         </select>
       </div>
-
       <div class="filter-group">
         <label>Difficulty</label>
-        <select id="fil-difficulty">
+        <select id="${p}-difficulty">
           <option value="">All</option>
-          ${difficulties.map(d => `<option value="${d}" ${_filters.difficulty===d?"selected":""}>${d}</option>`).join("")}
+          ${difficulties.map(d =>
+            `<option value="${d}" ${filters.difficulty===d?"selected":""}>${d}</option>`
+          ).join("")}
         </select>
       </div>
-
       <div class="filter-group">
         <label>Type</label>
-        <select id="fil-type">
+        <select id="${p}-type">
           <option value="">All</option>
-          ${types.map(t => `<option value="${_esc(t)}" ${_filters.type===t?"selected":""}>${_esc(t)}</option>`).join("")}
+          ${types.map(t =>
+            `<option value="${_esc(t)}" ${filters.type===t?"selected":""}>${_esc(t)}</option>`
+          ).join("")}
         </select>
       </div>
-
-      <div class="filter-group">
-        <label>Status</label>
-        <select id="fil-status">
-          <option value="active"   ${_filters.status==="active"  ?"selected":""}>Active</option>
-          <option value="archived" ${_filters.status==="archived"?"selected":""}>Archived</option>
-          <option value=""                                                       >All</option>
-        </select>
-      </div>
-
       <div class="filter-group">
         <label>2026 Flag</label>
-        <select id="fil-flag">
+        <select id="${p}-flag">
           <option value="">All</option>
-          ${flags.map(f => `<option value="${f.value}" ${_filters.flag===f.value?"selected":""}>${f.label}</option>`).join("")}
+          ${flagOpts.map(f =>
+            `<option value="${f.value}" ${filters.flag===f.value?"selected":""}>${f.label}</option>`
+          ).join("")}
         </select>
       </div>
-
-      <button class="filter-reset" id="btn-filter-reset">Reset</button>
+      <button class="filter-reset" id="btn-filter-reset-${prefix}">Reset</button>
     </div>
   `;
 }
 
 // ---------------------------------------------------------------------------
-// Card grid
+// Grid rendering
 // ---------------------------------------------------------------------------
 
-function _applyFilters(all) {
-  return all.filter(ws => {
-    if (_filters.level      && ws.level      !== _filters.level)      return false;
-    if (_filters.strand     && ws.strand     !== _filters.strand)     return false;
-    if (_filters.topic      && ws.topic      !== _filters.topic)      return false;
-    if (_filters.difficulty && ws.difficulty !== _filters.difficulty) return false;
-    if (_filters.type       && ws.type       !== _filters.type)       return false;
-    if (_filters.status     && ws.status     !== _filters.status)     return false;
-    if (_filters.flag) {
+function _applyFilters(list, filters) {
+  return list.filter(ws => {
+    if (filters.level      && ws.level      !== filters.level)      return false;
+    if (filters.strand     && ws.strand     !== filters.strand)     return false;
+    if (filters.topic      && ws.topic      !== filters.topic)      return false;
+    if (filters.difficulty && ws.difficulty !== filters.difficulty) return false;
+    if (filters.type       && ws.type       !== filters.type)       return false;
+    if (filters.flag) {
       const f = getFlag(ws.topic);
-      if (!f || f.flag !== _filters.flag) return false;
+      if (!f || f.flag !== filters.flag) return false;
     }
     return true;
   });
 }
 
-async function _renderGrid() {
-  const wrap = document.getElementById("card-grid-wrap");
+async function _renderTabGrid(tab, allParam) {
+  const all = allParam || await getAllWorksheets();
+
+  if (tab === "worksheets") {
+    const base  = all.filter(w => w.origin !== "imported" && w.status !== "archived");
+    const items = _applyFilters(base, _wsFilters);
+    _renderGrid("grid-active-ws", items, "worksheet", false,
+      base.length === 0
+        ? "No worksheets yet. Create your first one!"
+        : "No worksheets match the current filters.");
+
+  } else if (tab === "papers") {
+    const base  = all.filter(w => w.origin === "imported" && w.status !== "archived");
+    const items = _applyFilters(base, _paperFilters);
+    _renderGrid("grid-active-papers", items, "paper", false,
+      base.length === 0
+        ? "No papers yet. Import scraped papers via the \u2191 Import button."
+        : "No papers match the current filters.");
+
+  } else if (tab === "archived-ws") {
+    const items = all.filter(w => w.origin !== "imported" && w.status === "archived");
+    _renderGrid("grid-archived-ws", items, "worksheet", true,
+      "No archived worksheets.");
+
+  } else if (tab === "archived-papers") {
+    const items = all.filter(w => w.origin === "imported" && w.status === "archived");
+    _renderGrid("grid-archived-papers", items, "paper", true,
+      "No archived papers.");
+  }
+}
+
+function _renderGrid(gridId, items, type, isArchived, emptyMsg) {
+  const wrap = document.getElementById(gridId);
   if (!wrap) return;
 
-  const all      = await getAllWorksheets();
-  const filtered = _applyFilters(all);
-
-  if (filtered.length === 0) {
+  if (items.length === 0) {
     wrap.innerHTML = `
-      <div class="empty-state">
+      <div class="empty-state" style="padding:20px 0">
         <div class="empty-state__icon">&#128196;</div>
-        <div class="empty-state__text">
-          ${all.length === 0
-            ? "No worksheets yet. Create your first one!"
-            : "No worksheets match the current filters."}
-        </div>
-        ${all.length === 0
-          ? `<button class="btn btn-primary" id="btn-empty-new">+ New Worksheet</button>`
-          : ""}
+        <div class="empty-state__text">${emptyMsg}</div>
       </div>`;
-    document.getElementById("btn-empty-new")
-      ?.addEventListener("click", () => navigate("builder"));
     return;
   }
 
-  wrap.innerHTML = `<div class="card-grid">${filtered.map(_htmlCard).join("")}</div>`;
-  _bindCardActions();
+  wrap.innerHTML = `<div class="card-grid">
+    ${items.map(ws => _htmlCard(ws, type, isArchived)).join("")}
+  </div>`;
 }
 
-function _htmlCard(ws) {
-  const flag        = ws.topic ? getFlag(ws.topic) : null;
-  const totalMarks  = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
-  const qCount      = (ws.questions||[]).length;
-  const isArchived  = ws.status === "archived";
-  const activeStu   = getActiveStudent();   // sync — memory cache
+// ---------------------------------------------------------------------------
+// Card HTML
+// ---------------------------------------------------------------------------
+
+function _htmlCard(ws, type, isArchived) {
+  const flag       = ws.topic ? getFlag(ws.topic) : null;
+  const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
+  const qCount     = (ws.questions||[]).length;
+  const activeStu  = getActiveStudent();
 
   const diffBadgeClass = {
     Foundation: "badge-foundation",
@@ -222,35 +290,70 @@ function _htmlCard(ws) {
     Challenge:  "badge-challenge"
   }[ws.difficulty] || "badge-standard";
 
-  const flagBadge = flag
+  const flagBadge     = flag
     ? `<span class="badge badge-${flag.flag.replace("_","-")}">${_esc(flag.label)}</span>`
     : "";
-
   const archivedBadge = isArchived
     ? `<span class="badge badge-archived">Archived</span>`
     : "";
 
-  // Taken badge — only when a student is active and the worksheet has questions
+  // Taken badge — worksheets: score-based; papers: question-level
   let takenBadge = "";
   if (activeStu && qCount > 0) {
-    const takenSet   = new Set(activeStu.takenQuestions || []);
-    const takenCount = (ws.questions || []).filter(q => takenSet.has(ws.id + "::" + q.id)).length;
-    if (takenCount === qCount) {
-      takenBadge = `<span class="badge badge-ws-taken-all">&#10003; All taken</span>`;
-    } else if (takenCount > 0) {
-      takenBadge = `<span class="badge badge-ws-taken-partial">${takenCount}/${qCount} taken</span>`;
+    if (type === "worksheet") {
+      const hasTaken = (activeStu.scores||[]).some(s => s.wsId === ws.id);
+      takenBadge = hasTaken
+        ? `<span class="badge badge-ws-taken-all">&#10003; Taken</span>`
+        : `<span class="badge badge-ws-taken-none">Not taken</span>`;
     } else {
-      takenBadge = `<span class="badge badge-ws-taken-none">Not taken</span>`;
+      const takenSet   = new Set(activeStu.takenQuestions||[]);
+      const takenCount = (ws.questions||[]).filter(q => takenSet.has(ws.id+"::"+q.id)).length;
+      if (takenCount === qCount) {
+        takenBadge = `<span class="badge badge-ws-taken-all">&#10003; All taken</span>`;
+      } else if (takenCount > 0) {
+        takenBadge = `<span class="badge badge-ws-taken-partial">${takenCount}/${qCount} taken</span>`;
+      } else {
+        takenBadge = `<span class="badge badge-ws-taken-none">Not taken</span>`;
+      }
     }
   }
+
+  // Footer action button(s)
+  let actionBtns;
+  if (isArchived && type === "paper") {
+    // Archived Papers: Recover + Delete (both require confirm)
+    actionBtns = `
+      <button class="btn btn-sm btn-primary btn-card-recover" data-id="${_esc(ws.id)}">Recover</button>
+      <button class="btn btn-sm btn-danger  btn-card-delete"  data-id="${_esc(ws.id)}">Delete</button>`;
+  } else if (isArchived) {
+    // Archived Worksheets: Restore
+    actionBtns = `
+      <button class="btn btn-sm btn-card-unarchive" data-id="${_esc(ws.id)}">Restore</button>`;
+  } else {
+    // Active cards: Archive
+    actionBtns = `
+      <button class="btn btn-sm btn-danger btn-card-archive" data-id="${_esc(ws.id)}">Archive</button>`;
+  }
+
+  // Score section — worksheets only (not archived papers)
+  const scoreSection = (activeStu && type === "worksheet") ? (() => {
+    const latest = getScoresForWorksheet(activeStu.id, ws.id)[0];
+    const scoreDisplay = latest
+      ? `<div class="ws-card__score">Last: ${latest.score}/${latest.total} &bull; ${_esc(latest.date)}</div>`
+      : `<div class="ws-card__score ws-card__score--none">No score yet</div>`;
+    return `
+      <div class="ws-card__score-section">
+        ${scoreDisplay}
+        <button class="btn btn-sm btn-card-score" data-id="${_esc(ws.id)}">Record Score</button>
+      </div>`;
+  })() : "";
 
   return `
     <div class="ws-card ${isArchived?"ws-card--archived":""}" data-id="${_esc(ws.id)}">
       <div class="ws-card__header">
-        <div class="ws-card__title">${_esc(ws.title || "Untitled")}</div>
+        <div class="ws-card__title">${_esc(ws.title||"Untitled")}</div>
         ${ws.level ? `<span class="badge badge-level">${_esc(ws.level)}</span>` : ""}
       </div>
-
       <div class="ws-card__flags">
         ${flagBadge}
         ${archivedBadge}
@@ -258,38 +361,22 @@ function _htmlCard(ws) {
         ${ws.type ? `<span class="badge" style="background:var(--grey-200);color:var(--grey-800)">${_esc(ws.type)}</span>` : ""}
         ${takenBadge}
       </div>
-
       <div class="ws-card__meta">
         ${ws.strand ? `<div><strong>Strand:</strong> ${_esc(ws.strand)}</div>` : ""}
         ${ws.topic  ? `<div><strong>Topic:</strong> ${_esc(ws.topic)}</div>`  : ""}
         <div>${qCount} question${qCount!==1?"s":""} &bull; ${totalMarks} mark${totalMarks!==1?"s":""}</div>
         <div>Created ${_esc(ws.createdAt||"—")}
           ${ws.updatedAt && ws.updatedAt !== ws.createdAt
-            ? ` &bull; Updated ${_esc(ws.updatedAt)}`
-            : ""}
-          ${ws.version > 1 ? ` &bull; v${ws.version}` : ""}
+            ? ` &bull; Updated ${_esc(ws.updatedAt)}` : ""}
         </div>
       </div>
-
       <div class="ws-card__footer">
         <button class="btn btn-sm btn-card-preview"   data-id="${_esc(ws.id)}">Preview</button>
         <button class="btn btn-sm btn-card-edit"      data-id="${_esc(ws.id)}">Edit</button>
         <button class="btn btn-sm btn-card-duplicate" data-id="${_esc(ws.id)}">Duplicate</button>
-        ${isArchived
-          ? `<button class="btn btn-sm btn-card-unarchive" data-id="${_esc(ws.id)}">Restore</button>`
-          : `<button class="btn btn-sm btn-danger btn-card-archive" data-id="${_esc(ws.id)}">Archive</button>`}
+        ${actionBtns}
       </div>
-
-      ${activeStu ? (() => {
-        const latest = getScoresForWorksheet(activeStu.id, ws.id)[0];  // sync — uses cache
-        const scoreDisplay = latest
-          ? `<div class="ws-card__score">Last: ${latest.score}/${latest.total} &bull; ${_esc(latest.date)}</div>`
-          : `<div class="ws-card__score ws-card__score--none">No score yet</div>`;
-        return `<div class="ws-card__score-section">
-          ${scoreDisplay}
-          <button class="btn btn-sm btn-card-score" data-id="${_esc(ws.id)}">Record Score</button>
-        </div>`;
-      })() : ""}
+      ${scoreSection}
     </div>
   `;
 }
@@ -298,100 +385,106 @@ function _htmlCard(ws) {
 // Event binding
 // ---------------------------------------------------------------------------
 
-function _bindFilters() {
-  // New worksheet button in stats bar
+function _bindLibrary() {
+  // Single delegated listener on lib-wrap handles tabs AND card actions
+  document.getElementById("lib-wrap")?.addEventListener("click", async e => {
+    const tabBtn = e.target.closest(".lib-tab[data-tab]");
+    if (tabBtn) { await _switchTab(tabBtn.dataset.tab); return; }
+    _onCardClick(e);
+  });
+
+  _bindTabContent(_activeTab);
+}
+
+function _bindTabContent(tab) {
   document.getElementById("btn-new-from-library")
     ?.addEventListener("click", () => navigate("builder"));
+  if (tab === "worksheets") _bindFilterBar("ws");
+  if (tab === "papers")     _bindFilterBar("paper");
+}
 
-  // Level cascade
-  document.getElementById("fil-level")?.addEventListener("change", e => {
-    _filters.level  = e.target.value;
-    _filters.strand = "";
-    _filters.topic  = "";
-    _rebuildFilterBar();
+function _bindFilterBar(prefix) {
+  const filters = prefix === "ws" ? _wsFilters : _paperFilters;
+  const p = `fil-${prefix}`;
+
+  document.getElementById(`${p}-level`)?.addEventListener("change", e => {
+    filters.level = e.target.value; filters.strand = ""; filters.topic = "";
+    _rebuildFilterBar(prefix);
   });
-
-  document.getElementById("fil-strand")?.addEventListener("change", e => {
-    _filters.strand = e.target.value;
-    _filters.topic  = "";
-    _rebuildFilterBar();
+  document.getElementById(`${p}-strand`)?.addEventListener("change", e => {
+    filters.strand = e.target.value; filters.topic = "";
+    _rebuildFilterBar(prefix);
   });
-
-  // Simple filters
-  const simple = [
-    ["fil-topic",      "topic"],
-    ["fil-difficulty", "difficulty"],
-    ["fil-type",       "type"],
-    ["fil-status",     "status"],
-    ["fil-flag",       "flag"]
-  ];
-  simple.forEach(([id, key]) => {
-    document.getElementById(id)?.addEventListener("change", e => {
-      _filters[key] = e.target.value;
-      _renderGrid();
+  for (const key of ["topic","difficulty","type","flag"]) {
+    document.getElementById(`${p}-${key}`)?.addEventListener("change", e => {
+      filters[key] = e.target.value;
+      _renderTabGrid(_activeTab);
     });
-  });
-
-  // Reset
-  document.getElementById("btn-filter-reset")?.addEventListener("click", () => {
-    _filters = { level:"", strand:"", topic:"", difficulty:"", type:"", status:"active", flag:"" };
-    _rebuildFilterBar();
+  }
+  document.getElementById(`btn-filter-reset-${prefix}`)?.addEventListener("click", () => {
+    if (prefix === "ws") _wsFilters    = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
+    else                 _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
+    _rebuildFilterBar(prefix);
   });
 }
 
-function _rebuildFilterBar() {
-  const filterWrap = document.querySelector(".filter-bar");
-  if (!filterWrap) return;
-  filterWrap.outerHTML = _htmlFilterBar();
-  _bindFilters();
-  _renderGrid();
+function _rebuildFilterBar(prefix) {
+  const wrap = document.getElementById(`filter-wrap-${prefix}`);
+  if (!wrap) return;
+  const filters = prefix === "ws" ? _wsFilters : _paperFilters;
+  wrap.innerHTML = _htmlFilterBar(prefix, filters);
+  _bindFilterBar(prefix);
+  _renderTabGrid(_activeTab);
 }
 
-function _bindCardActions() {
-  const grid = document.querySelector(".card-grid");
-  if (!grid) return;
+async function _switchTab(tab) {
+  _activeTab = tab;
 
-  grid.addEventListener("click", e => {
-    const btn = e.target.closest("button[data-id]");
-    if (!btn) return;
-    const id = btn.dataset.id;
-
-    if (btn.classList.contains("btn-card-preview"))   { navigate("preview", { editingId: id }); return; }
-    if (btn.classList.contains("btn-card-edit"))      { _handleEdit(id);        return; }
-    if (btn.classList.contains("btn-card-duplicate")) { _handleDuplicate(id);   return; }
-    if (btn.classList.contains("btn-card-archive"))   { _handleArchive(id);     return; }
-    if (btn.classList.contains("btn-card-unarchive")) { _handleUnarchive(id);   return; }
-    if (btn.classList.contains("btn-card-score"))     { _handleRecordScore(id); return; }
+  // Update tab button styles
+  document.querySelectorAll(".lib-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
   });
+
+  // Replace tab content
+  const content = document.getElementById("lib-tab-content");
+  if (!content) return;
+  content.innerHTML = _htmlTabContent(tab);
+
+  _bindTabContent(tab);
+  await _renderTabGrid(tab);
+}
+
+function _onCardClick(e) {
+  const btn = e.target.closest("button[data-id]");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.classList.contains("btn-card-preview"))   { navigate("preview", { editingId: id }); return; }
+  if (btn.classList.contains("btn-card-edit"))      { navigate("builder", { editingId: id }); return; }
+  if (btn.classList.contains("btn-card-duplicate")) { _handleDuplicate(id);   return; }
+  if (btn.classList.contains("btn-card-archive"))   { _handleArchive(id);     return; }
+  if (btn.classList.contains("btn-card-unarchive")) { _handleUnarchive(id);   return; }
+  if (btn.classList.contains("btn-card-recover"))   { _handleRecover(id);     return; }
+  if (btn.classList.contains("btn-card-delete"))    { _handleDelete(id);      return; }
+  if (btn.classList.contains("btn-card-score"))     { _handleRecordScore(id); return; }
 }
 
 // ---------------------------------------------------------------------------
 // Card actions
 // ---------------------------------------------------------------------------
 
-function _handleEdit(id) {
-  navigate("builder", { editingId: id });
-}
-
 async function _handleDuplicate(id) {
   const ws = await getWorksheet(id);
   if (!ws) return;
-
   const copy = {
     ...ws,
-    id:        undefined,
-    title:     "Copy of " + ws.title,
-    status:    "active",
-    version:   1,
-    createdAt: undefined,
-    updatedAt: undefined,
-    questions: (ws.questions || []).map(q => ({ ...q, id: "q" + Date.now() + Math.random() }))
+    id: undefined, title: "Copy of " + ws.title,
+    status: "active", version: 1, createdAt: undefined, updatedAt: undefined,
+    questions: (ws.questions||[]).map(q => ({ ...q, id: "q" + Date.now() + Math.random() }))
   };
-
   try {
     await saveWorksheet(copy);
-    showToast("Worksheet duplicated.", "success");
-    _renderGrid();
+    showToast("Duplicated.", "success");
+    await _rerenderLibrary();
   } catch (e) {
     showToast("Duplicate failed: " + e.message, "error");
   }
@@ -400,8 +493,8 @@ async function _handleDuplicate(id) {
 async function _handleArchive(id) {
   try {
     await archiveWorksheet(id);
-    showToast("Worksheet archived.");
-    _renderGrid();
+    showToast("Archived.");
+    await _rerenderLibrary();
   } catch (e) {
     showToast("Archive failed: " + e.message, "error");
   }
@@ -410,22 +503,46 @@ async function _handleArchive(id) {
 async function _handleUnarchive(id) {
   try {
     await unarchiveWorksheet(id);
-    showToast("Worksheet restored to active.", "success");
-    _renderGrid();
+    showToast("Restored.", "success");
+    await _rerenderLibrary();
   } catch (e) {
     showToast("Restore failed: " + e.message, "error");
   }
 }
 
+async function _handleRecover(id) {
+  if (!confirm("Restore this paper to Available Papers?")) return;
+  try {
+    await unarchiveWorksheet(id);
+    showToast("Paper recovered.", "success");
+    await _rerenderLibrary();
+  } catch (e) {
+    showToast("Recover failed: " + e.message, "error");
+  }
+}
+
+async function _handleDelete(id) {
+  const ws = await getWorksheet(id);
+  if (!ws) return;
+  const title = ws.title || "Untitled";
+  if (!confirm(`Permanently delete "${title}"? This cannot be undone.`)) return;
+  try {
+    await deleteWorksheet(id);
+    showToast("Paper deleted.", "success");
+    await _rerenderLibrary();
+  } catch (e) {
+    showToast("Delete failed: " + e.message, "error");
+  }
+}
+
 async function _handleRecordScore(wsId) {
   const ws  = await getWorksheet(wsId);
-  const stu = getActiveStudent();   // sync — cache
+  const stu = getActiveStudent();
   if (!ws || !stu) return;
 
   const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
 
   document.getElementById("score-modal")?.remove();
-
   const modal = document.createElement("div");
   modal.id        = "score-modal";
   modal.className = "qb-modal-overlay";
@@ -436,7 +553,9 @@ async function _handleRecordScore(wsId) {
         <button class="qb-modal__close" id="score-modal-close" aria-label="Close">&times;</button>
       </div>
       <div class="qb-modal__body score-form">
-        <div style="margin-bottom:12px;font-size:13px;color:var(--grey-600)">${_esc(ws.title || "Untitled")} &mdash; ${_esc(stu.name)}</div>
+        <div style="margin-bottom:12px;font-size:13px;color:var(--grey-600)">
+          ${_esc(ws.title||"Untitled")} &mdash; ${_esc(stu.name)}
+        </div>
         <div class="form-group" style="margin-bottom:12px">
           <label>Total Marks</label>
           <input type="number" id="score-total" value="${totalMarks}" min="1" />
@@ -456,7 +575,6 @@ async function _handleRecordScore(wsId) {
       </div>
     </div>
   `;
-
   document.body.appendChild(modal);
 
   const close = () => modal.remove();
@@ -465,25 +583,25 @@ async function _handleRecordScore(wsId) {
   modal.addEventListener("click", e => { if (e.target === modal) close(); });
 
   document.getElementById("score-modal-save")?.addEventListener("click", async () => {
-    const obtainedVal = document.getElementById("score-obtained")?.value;
-    const totalVal    = document.getElementById("score-total")?.value;
-    const date        = document.getElementById("score-date")?.value || new Date().toISOString().slice(0,10);
+    const obtained = parseInt(document.getElementById("score-obtained")?.value);
+    const total    = parseInt(document.getElementById("score-total")?.value);
+    const date     = document.getElementById("score-date")?.value
+                     || new Date().toISOString().slice(0,10);
 
-    const obtained = parseInt(obtainedVal);
-    const total    = parseInt(totalVal);
-
-    if (isNaN(obtained) || obtained < 0)  { showToast("Enter a valid score.", "error"); return; }
-    if (isNaN(total) || total < 1)        { showToast("Total marks must be at least 1.", "error"); return; }
-    if (obtained > total)                 { showToast("Score cannot exceed total marks.", "error"); return; }
+    if (isNaN(obtained) || obtained < 0) { showToast("Enter a valid score.",            "error"); return; }
+    if (isNaN(total)    || total < 1)    { showToast("Total marks must be at least 1.", "error"); return; }
+    if (obtained > total)                { showToast("Score cannot exceed total marks.", "error"); return; }
 
     await recordScore(stu.id, wsId, obtained, total, date);
 
-    // Mark all questions in this worksheet as taken
-    const qKeys = (ws.questions || []).map(q => ws.id + "::" + q.id);
-    await markQuestionsTaken(stu.id, qKeys);
+    // For source papers, also mark all questions as taken
+    if (ws.origin === "imported") {
+      const qKeys = (ws.questions||[]).map(q => ws.id + "::" + q.id);
+      await markQuestionsTaken(stu.id, qKeys);
+    }
 
     close();
-    await _renderGrid();
+    await _rerenderLibrary();
     showToast("Score recorded.", "success");
   });
 
@@ -491,7 +609,7 @@ async function _handleRecordScore(wsId) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared escape helper (same as builder.js — each module is self-contained)
+// Escape helper
 // ---------------------------------------------------------------------------
 
 function _esc(str) {

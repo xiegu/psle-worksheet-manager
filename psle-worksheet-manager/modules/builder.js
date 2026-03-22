@@ -149,7 +149,10 @@ function _htmlQuestionsSection() {
     <div class="question-list" id="question-list">
       ${_questions.map((q, i) => _htmlQuestionCard(q, i)).join("")}
     </div>
-    <button class="btn btn-primary" id="btn-add-question" style="margin-top:12px">+ Add Question</button>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" id="btn-add-question">+ Add Blank Question</button>
+      <button class="btn" id="btn-pick-from-qb">&#10067; Pick from Question Bank</button>
+    </div>
     <div class="marks-total" id="marks-total">${_marksLabel()}</div>
   `;
 }
@@ -470,10 +473,15 @@ function _bindQuestions() {
   const list = document.getElementById("question-list");
   if (!list) return;
 
-  // Add question
+  // Add blank question
   document.getElementById("btn-add-question")?.addEventListener("click", () => {
     _questions.push({ id: "q" + Date.now(), type: "short_answer", text: "", marks: 1, answer: "", working: "" });
     _rerenderQuestions();
+  });
+
+  // Pick from Question Bank
+  document.getElementById("btn-pick-from-qb")?.addEventListener("click", () => {
+    _showQBPickerModal();
   });
 
   // Delegate: delete, field edits, type change
@@ -666,6 +674,166 @@ function _validate() {
   }
 
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Question Bank picker modal
+// ---------------------------------------------------------------------------
+
+async function _showQBPickerModal() {
+  document.getElementById("builder-qb-modal")?.remove();
+
+  // Fetch all questions from active source papers
+  const allQ = [];
+  for (const ws of (await getAllWorksheets()).filter(w => w.origin === "imported" && w.status !== "archived")) {
+    for (const q of (ws.questions || [])) {
+      if (!q.id || !q.text) continue;
+      allQ.push({
+        ...q,
+        _key:     ws.id + "::" + q.id,
+        _wsTitle: ws.title,
+        _wsLevel: ws.level,
+        _wsTopic: q.topic || ws.topic
+      });
+    }
+  }
+
+  const stu      = getActiveStudent();
+  const takenSet = stu ? new Set(stu.takenQuestions || []) : new Set();
+  const pickedKeys = new Set();
+
+  const levels = ["P1","P2","P3","P4","P5","P6"];
+  let levelFilter = "";
+  let searchText  = "";
+
+  function _filtered() {
+    return allQ.filter(q => {
+      if (levelFilter && q._wsLevel !== levelFilter) return false;
+      if (searchText  && !q.text.toLowerCase().includes(searchText.toLowerCase())) return false;
+      return true;
+    });
+  }
+
+  function _renderList() {
+    const items = _filtered();
+    const listEl = document.getElementById("builder-qb-list");
+    const addBtn = document.getElementById("builder-qb-add");
+    if (!listEl) return;
+
+    if (items.length === 0) {
+      listEl.innerHTML = `<div style="padding:24px;text-align:center;color:var(--grey-400)">No questions match.</div>`;
+    } else {
+      listEl.innerHTML = items.map(q => {
+        const isTaken   = takenSet.has(q._key);
+        const isPicked  = pickedKeys.has(q._key);
+        const shortText = q.text.length > 160 ? q.text.slice(0, 160) + "…" : q.text;
+        return `
+          <label class="builder-qb-item ${isPicked ? "builder-qb-item--selected" : ""}">
+            <input type="checkbox" class="builder-qb-check" data-key="${_esc(q._key)}" ${isPicked ? "checked" : ""} />
+            <div class="builder-qb-item__content">
+              <div class="builder-qb-item__meta">
+                ${q._wsLevel ? `<span class="badge badge-level" style="font-size:10px">${_esc(q._wsLevel)}</span>` : ""}
+                ${q._wsTopic ? `<strong>${_esc(q._wsTopic)}</strong>` : ""}
+                <span style="color:var(--grey-400)">&mdash; ${_esc(q._wsTitle||"")}</span>
+                ${isTaken ? `<span class="badge badge-taken" style="font-size:10px">Taken</span>` : ""}
+              </div>
+              <div class="builder-qb-item__text">${_esc(shortText)}</div>
+              ${q.diagramImage
+                ? `<img src="${q.diagramImage}" style="max-height:60px;max-width:100%;margin-top:4px;border:1px solid #ccc;border-radius:2px" alt="Diagram" />`
+                : ""}
+            </div>
+          </label>`;
+      }).join("");
+    }
+
+    // Bind checkboxes
+    listEl.querySelectorAll(".builder-qb-check").forEach(cb => {
+      cb.addEventListener("change", e => {
+        const key = e.target.dataset.key;
+        if (e.target.checked) pickedKeys.add(key);
+        else pickedKeys.delete(key);
+        _renderList();
+      });
+    });
+
+    if (addBtn) {
+      addBtn.textContent = pickedKeys.size > 0
+        ? `Add ${pickedKeys.size} Question${pickedKeys.size !== 1 ? "s" : ""}`
+        : "Add Selected";
+      addBtn.disabled = pickedKeys.size === 0;
+    }
+  }
+
+  const modal = document.createElement("div");
+  modal.id        = "builder-qb-modal";
+  modal.className = "qb-modal-overlay";
+  modal.innerHTML = `
+    <div class="qb-modal" role="dialog" aria-modal="true"
+         style="max-width:680px;width:95vw;max-height:82vh;display:flex;flex-direction:column">
+      <div class="qb-modal__header">
+        <div style="font-weight:700;font-size:15px">&#10067; Pick from Question Bank</div>
+        <button class="qb-modal__close" id="builder-qb-close" aria-label="Close">&times;</button>
+      </div>
+      <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+        <div class="filter-group" style="min-width:90px">
+          <label>Level</label>
+          <select id="builder-qb-level">
+            <option value="">All</option>
+            ${levels.map(l => `<option value="${l}">${l}</option>`).join("")}
+          </select>
+        </div>
+        <div class="filter-group" style="flex:1;min-width:180px">
+          <label>Search</label>
+          <input type="text" id="builder-qb-search" placeholder="Type to search question text…"
+                 style="padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;width:100%" />
+        </div>
+      </div>
+      <div id="builder-qb-list"
+           style="overflow-y:auto;flex:1;padding:8px 16px;display:flex;flex-direction:column;gap:6px"></div>
+      <div class="qb-modal__footer">
+        <button class="btn btn-primary" id="builder-qb-add" disabled>Add Selected</button>
+        <button class="btn" id="builder-qb-cancel">Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  document.getElementById("builder-qb-close")?.addEventListener("click",  close);
+  document.getElementById("builder-qb-cancel")?.addEventListener("click", close);
+  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+
+  document.getElementById("builder-qb-level")?.addEventListener("change", e => {
+    levelFilter = e.target.value;
+    _renderList();
+  });
+  document.getElementById("builder-qb-search")?.addEventListener("input", e => {
+    searchText = e.target.value;
+    _renderList();
+  });
+
+  document.getElementById("builder-qb-add")?.addEventListener("click", () => {
+    const toAdd = allQ.filter(q => pickedKeys.has(q._key));
+    toAdd.forEach(q => {
+      const newQ = {
+        id:      "q" + Date.now() + Math.random(),
+        type:    q.type,
+        text:    q.text,
+        marks:   q.marks,
+        answer:  q.answer  || "",
+        working: q.working || ""
+      };
+      if (q.type === "mcq" && q.options) newQ.options = [...q.options];
+      if (q.diagramImage) newQ.diagramImage = q.diagramImage;
+      _questions.push(newQ);
+    });
+    close();
+    _rerenderQuestions();
+    showToast(`Added ${toAdd.length} question${toAdd.length !== 1 ? "s" : ""}.`, "success");
+  });
+
+  _renderList();
+  document.getElementById("builder-qb-search")?.focus();
 }
 
 // Add drag-over visual to CSS dynamically (one-time)

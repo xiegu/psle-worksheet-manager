@@ -54,6 +54,7 @@ function _openDB() {
 async function initDB() {
   _db = await _openDB();
   await _migrateFromLocalStorage();
+  await _migrateOrigin();
   const activeId = localStorage.getItem(ACTIVE_STUDENT_KEY);
   if (activeId) _cachedActiveStudent = await getStudent(activeId);
 }
@@ -93,6 +94,24 @@ async function _migrateFromLocalStorage() {
   } catch (e) {
     console.warn("[storage] localStorage migration failed (non-fatal):", e.message);
   }
+}
+
+// One-time migration: tag existing worksheets with origin field.
+// Heuristic: any question with diagramImage → "imported" (scraped paper);
+// otherwise → "built" (manually created in builder).
+async function _migrateOrigin() {
+  const all = await getAllWorksheets();
+  const toUpdate = all.filter(ws => !ws.origin);
+  if (toUpdate.length === 0) return;
+
+  const tx = _db.transaction(WS_STORE, "readwrite");
+  const st = tx.objectStore(WS_STORE);
+  for (const ws of toUpdate) {
+    const hasImage = (ws.questions || []).some(q => q.diagramImage);
+    st.put({ ...ws, origin: hasImage ? "imported" : "built" });
+  }
+  await _txDone(tx);
+  console.log(`[storage] Origin migration: tagged ${toUpdate.length} worksheet(s)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +192,7 @@ async function saveWorksheet(ws) {
   const created = {
     title: "", level: "", strand: "", topic: "",
     difficulty: "Standard", type: "Practice",
+    origin: "built",
     version: 1, status: "active", questions: [], notes: "",
     ...ws,
     id:        "ws_" + Date.now(),
@@ -255,7 +275,7 @@ async function importAll(jsonString) {
   let imported = 0, skipped = 0;
   for (const ws of incoming) {
     if (!ws.id || !ws.title) { skipped++; continue; }
-    existingMap.set(ws.id, ws);
+    existingMap.set(ws.id, { origin: "imported", ...ws });
     imported++;
   }
 

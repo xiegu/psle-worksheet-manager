@@ -7,12 +7,12 @@
 // ---------------------------------------------------------------------------
 
 let _qbFilters = {
-  level:      "",
-  strand:     "",
-  topic:      "",
-  difficulty: "",
-  qtype:      "",  // "mcq" | "short_answer" | "long_answer"
-  hideTaken:  false
+  level:       "",
+  strand:      "",
+  topic:       "",
+  difficulty:  "",
+  qtype:       "",  // "mcq" | "short_answer" | "long_answer"
+  takenFilter: ""   // "" = All, "taken" = Taken only, "not-taken" = Not taken only
 };
 
 let _selected = new Set(); // set of composite keys "wsId::qId"
@@ -23,8 +23,8 @@ let _selected = new Set(); // set of composite keys "wsId::qId"
 
 async function renderQuestionBank(container) {
   _selected.clear();
-  // Reset hideTaken if no student is active so it doesn't silently filter
-  if (!getActiveStudent()) _qbFilters.hideTaken = false;
+  // Reset takenFilter if no student is active so it doesn't silently filter
+  if (!getActiveStudent()) _qbFilters.takenFilter = "";
   const allQ = await _getAllEnrichedQuestions();
 
   container.innerHTML = `
@@ -44,7 +44,8 @@ async function renderQuestionBank(container) {
 
 async function _getAllEnrichedQuestions() {
   const result = [];
-  for (const ws of await getAllWorksheets()) {
+  // Only questions from active source papers appear in the Question Bank
+  for (const ws of (await getAllWorksheets()).filter(w => w.origin === "imported" && w.status !== "archived")) {
     for (const q of (ws.questions || [])) {
       if (!q.id || !q.text) continue;
       result.push({
@@ -162,9 +163,13 @@ function _htmlQBFilterBar() {
       </div>
 
       ${getActiveStudent() ? `
-      <div class="filter-group filter-group--toggle">
-        <label for="qbf-hide-taken">Hide Taken</label>
-        <input type="checkbox" id="qbf-hide-taken" ${_qbFilters.hideTaken ? "checked" : ""} />
+      <div class="filter-group">
+        <label>Taken</label>
+        <select id="qbf-taken">
+          <option value=""          ${_qbFilters.takenFilter===""         ?"selected":""}>All</option>
+          <option value="taken"     ${_qbFilters.takenFilter==="taken"    ?"selected":""}>Taken</option>
+          <option value="not-taken" ${_qbFilters.takenFilter==="not-taken"?"selected":""}>Not taken</option>
+        </select>
       </div>` : ""}
 
       <button class="filter-reset" id="qbf-reset">Reset</button>
@@ -177,8 +182,8 @@ function _htmlQBFilterBar() {
 // ---------------------------------------------------------------------------
 
 function _applyQBFilters(allQ) {
-  const stu      = _qbFilters.hideTaken ? getActiveStudent() : null;
-  const takenSet = stu ? new Set(stu.takenQuestions || []) : null;
+  const stu      = getActiveStudent();
+  const takenSet = stu ? new Set(stu.takenQuestions || []) : new Set();
 
   return allQ.filter(q => {
     if (_qbFilters.level      && q._wsLevel      !== _qbFilters.level)      return false;
@@ -186,7 +191,8 @@ function _applyQBFilters(allQ) {
     if (_qbFilters.topic      && q._wsTopic      !== _qbFilters.topic)      return false;
     if (_qbFilters.difficulty && q._wsDifficulty !== _qbFilters.difficulty) return false;
     if (_qbFilters.qtype      && q.type          !== _qbFilters.qtype)      return false;
-    if (takenSet              && takenSet.has(q._key))                       return false;
+    if (_qbFilters.takenFilter === "taken"     && !takenSet.has(q._key))    return false;
+    if (_qbFilters.takenFilter === "not-taken" &&  takenSet.has(q._key))    return false;
     return true;
   });
 }
@@ -350,13 +356,13 @@ function _bindQBFilters() {
     });
   });
 
-  document.getElementById("qbf-hide-taken")?.addEventListener("change", e => {
-    _qbFilters.hideTaken = e.target.checked;
+  document.getElementById("qbf-taken")?.addEventListener("change", e => {
+    _qbFilters.takenFilter = e.target.value;
     _renderQBGrid();
   });
 
   document.getElementById("qbf-reset")?.addEventListener("click", () => {
-    _qbFilters = { level:"", strand:"", topic:"", difficulty:"", qtype:"", hideTaken: false };
+    _qbFilters = { level:"", strand:"", topic:"", difficulty:"", qtype:"", takenFilter:"" };
     _rebuildQBFilterBar();
   });
 }
@@ -460,6 +466,7 @@ async function _buildFromSelected() {
       working: q.working || ""
     };
     if (q.type === "mcq" && q.options) clean.options = [...q.options];
+    if (q.diagramImage) clean.diagramImage = q.diagramImage;
     return clean;
   });
 

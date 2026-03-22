@@ -15,10 +15,10 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 | `app.js` | Done | Router — Library / Builder / Preview / Question Bank / Students views |
 | `data/syllabus.js` | Done | Full P1–P6 MOE 2021 taxonomy, 2026 flags, helper functions |
 | `modules/storage.js` | Done | IndexedDB CRUD (replaces localStorage; auto-migrates existing data on first load), export/import JSON backup (v2: includes student data) |
-| `modules/library.js` | Done | Dashboard with 7 combinable filters, stats bar, card grid; taken badges + Record Score per active student |
-| `modules/builder.js` | Done | 3-step worksheet creator with live preview, drag-to-reorder questions; shows diagram thumbnails in question cards |
-| `modules/preview.js` | Done | Full A4 in-app preview, student/teacher toggle; shared `generateWorksheetHTML` / `openPrintWindow` used by all print paths; renders `diagramImage` |
-| `modules/questionbank.js` | Done | Question Bank — flat view of all questions across worksheets, multi-select, build worksheet from selection; Taken badge per active student; Hide Taken filter |
+| `modules/library.js` | Done | 4-tab library (Active Worksheets / Available Papers / Archived Worksheets / Archived Papers); independent filter bars per active tab; origin-aware taken badges; Recover + Delete on archived papers |
+| `modules/builder.js` | Done | 3-step worksheet creator with live preview, drag-to-reorder; "Pick from Question Bank" modal for selecting source-paper questions directly into a new worksheet |
+| `modules/preview.js` | Done | Full A4 in-app preview, student/teacher toggle; shared `generateWorksheetHTML` / `openPrintWindow` used by all print paths; renders `diagramImage`; logo (100 px) in header |
+| `modules/questionbank.js` | Done | Question Bank — source papers only (active, imported); multi-select, build worksheet; Taken / Not taken / All dropdown filter; diagrams carried through to new worksheets |
 | `modules/students.js` | Done | Student manager — add/set active student, score history table, taken question count, Clear Taken / Delete; header pill indicator |
 | `templates/worksheet.html` | Done | Standalone static A4 print template (sample P6 Algebra paper) |
 
@@ -52,9 +52,15 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 - **Export/Import** — JSON backup and restore (v2 format includes student data) via header buttons
 - **IndexedDB storage** — worksheets and students stored in IndexedDB (no 5MB limit); existing localStorage data auto-migrated on first load; supports 1000+ papers (~700MB) with room to spare
 - **Student module** — add students, set active student, track taken questions per student, record scores per worksheet, view score history; active student shown in header pill
-- **Taken badges in Question Bank** — each question card shows a "Taken" badge when the active student has already received that question; "Hide taken" checkbox filter
-- **Taken labels on Library cards** — each card shows "All taken / X/Y taken / Not taken" status for the active student
-- **Score recording** — "Record Score" button on each library card opens a modal; saves score + marks all worksheet questions as taken for that student
+- **4-tab Library** — Active Worksheets / Available Papers / Archived Worksheets / Archived Papers tabs; each active tab has its own independent filter bar (Level→Strand→Topic, Difficulty, Type, 2026 Flag); archived tabs have no filters; stats bar shows counts for all 4 shelves
+- **Origin tagging** — imported papers tagged `origin:"imported"`; builder-created worksheets tagged `origin:"built"`; existing data auto-migrated on first load using diagram-image heuristic
+- **Taken badges — two modes** — Papers (imported): question-level "X/Y taken"; Worksheets (built): score-based "Taken / Not taken"
+- **Score recording** — "Record Score" on worksheet cards only; for source papers, recording a score also marks all questions as taken
+- **Archived Papers actions** — Recover (restore to Available Papers) and Delete (permanent) buttons, both requiring confirm dialog
+- **Question Bank — source papers only** — questions from builder-created worksheets and archived papers excluded; "Taken" filter is now a dropdown (All / Taken / Not taken)
+- **Builder — Pick from QB** — "Pick from Question Bank" button opens a modal with level filter + text search; multi-select questions from source papers and append them (with diagrams) directly into the worksheet being built
+- **Diagram fix** — `diagramImage` now correctly carried through from Question Bank to new worksheets
+- **Logo** — 100 px logo in worksheet header (in-app preview and print); name/class row height increased
 - **Scraper** — extracts full papers including both Paper 1 (MCQ) and Paper 2 (short/long); output imports cleanly via the app's Import button
 - **Diagram support** — `pdftoppm` converts PDF pages to JPEG; Claude returns `diagramBbox` coordinates; `sharp` crops each figure to a tight JPEG stored as `diagramImage` on the question; renders in Preview, print, builder card, live preview, and Question Bank modal
 - **Scraper output naming** — JSON files named by paper title (lowercase, e.g. `p6-maths-prelim-2025.json`) instead of generic `papers-output.json`
@@ -125,4 +131,5 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-22 — IndexedDB migration (no more 5MB localStorage limit; supports 1000+ papers); scraper: skip-cache + --force, school blacklist (PLMGS/RedSwastika) + --exclude, --model flag, Haiku for refinement pass, --refine-diagrams opt-in*
+*Last updated: 2026-03-22 — IndexedDB migration; scraper cost optimisations*
+*Updated: 2026-03-22 — 4-tab library (source papers vs worksheets); origin tagging + migration; logo in print output; diagram fix in QB→builder flow; QB taken dropdown; builder "Pick from QB" modal; archived papers Recover/Delete; taken badge logic split by origin*

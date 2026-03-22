@@ -74,7 +74,7 @@ function _renderPage(ws, teacherMode) {
     ${teacherMode ? `<div class="pv-watermark">ANSWER KEY</div>` : ""}
 
     <div class="pv-ws-header">
-      <div class="pv-logo">LOGO</div>
+      <div class="pv-logo"><img src="logo.png" alt="Logo" /></div>
       <div class="pv-title-block">
         <h1 class="pv-ws-title">Math Worksheet</h1>
         <div class="pv-ws-meta">
@@ -292,8 +292,9 @@ function generateWorksheetHTML(ws, teacherMode) {
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:"Times New Roman",Times,serif;font-size:13pt;color:#000;background:#e8e8e8;padding:24px}
   .page{width:210mm;min-height:297mm;background:#fff;margin:0 auto;padding:15mm;position:relative;box-shadow:0 2px 12px rgba(0,0,0,.18)}
-  .ws-header{display:flex;align-items:flex-start;gap:14px;border-bottom:2.5px solid #000;padding-bottom:8px;margin-bottom:10px}
-  .ws-logo{width:52px;height:52px;border:1.5px solid #999;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9pt;color:#aaa;flex-shrink:0;text-align:center}
+  .ws-header{display:flex;align-items:center;gap:14px;border-bottom:2.5px solid #000;padding-bottom:8px;margin-bottom:10px}
+  .ws-logo{width:100px;height:100px;border-radius:4px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .ws-logo img{width:100%;height:100%;object-fit:contain}
   .ws-title-block{flex:1}
   .ws-title-block h1{font-size:16pt;font-weight:bold;letter-spacing:.04em;text-transform:uppercase}
   .ws-meta{font-size:10pt;color:#333;margin-top:3px;display:flex;gap:18px;flex-wrap:wrap}
@@ -304,10 +305,10 @@ function generateWorksheetHTML(ws, teacherMode) {
   .badge-moved-down{background:#fff3cd;color:#856404;border:1px solid #ffeeba}
   .teacher-watermark{display:${teacherMode?"block":"none"};position:absolute;top:18mm;right:15mm;font-size:11pt;font-weight:bold;color:#c0392b;letter-spacing:.08em;border:2px solid #c0392b;padding:2px 8px;transform:rotate(-15deg);opacity:.7}
   .ws-info-row{display:flex;border:1.5px solid #000;margin-bottom:14px}
-  .ws-info-row .info-cell{flex:1;padding:5px 8px;border-right:1px solid #000;font-size:11pt}
+  .ws-info-row .info-cell{flex:1;padding:10px 8px;border-right:1px solid #000;font-size:11pt}
   .ws-info-row .info-cell:last-child{border-right:none}
   .ws-info-row .info-cell span{display:block;font-size:8.5pt;color:#555;margin-bottom:2px}
-  .ws-info-row .info-cell .blank-line{border-bottom:1px solid #555;display:block;width:100%}
+  .ws-info-row .info-cell .blank-line{border-bottom:1px solid #555;display:block;width:100%;height:26px}
   .ws-instructions{font-size:10pt;font-style:italic;margin-bottom:12px;padding:5px 8px;background:#f7f7f7;border-left:3px solid #1a56a0}
   .question{margin-bottom:18px;page-break-inside:avoid}
   .question-stem{display:flex;gap:8px;align-items:baseline;margin-bottom:6px}
@@ -341,7 +342,7 @@ function generateWorksheetHTML(ws, teacherMode) {
 <div class="page">
   <div class="teacher-watermark">ANSWER KEY</div>
   <div class="ws-header">
-    <div class="ws-logo">LOGO</div>
+    <div class="ws-logo">${window.LOGO_DATA_URL ? `<img src="${window.LOGO_DATA_URL}" alt="Logo" />` : ""}</div>
     <div class="ws-title-block">
       <h1>Math Worksheet</h1>
       <div class="ws-meta">
@@ -456,19 +457,20 @@ function _injectPreviewStyles() {
     /* Header */
     .pv-ws-header {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       gap: 14px;
       border-bottom: 2.5px solid #000;
       padding-bottom: 8px;
       margin-bottom: 10px;
     }
     .pv-logo {
-      width: 52px; height: 52px;
-      border: 1.5px solid #999;
+      width: 100px; height: 100px;
       border-radius: 4px;
+      flex-shrink: 0;
+      overflow: hidden;
       display: flex; align-items: center; justify-content: center;
-      font-size: 9pt; color: #aaa; flex-shrink: 0; text-align: center;
     }
+    .pv-logo img { width: 100%; height: 100%; object-fit: contain; }
     .pv-title-block { flex: 1; }
     .pv-ws-title {
       font-size: 16pt;
@@ -508,7 +510,7 @@ function _injectPreviewStyles() {
     }
     .pv-info-cell {
       flex: 1;
-      padding: 5px 8px;
+      padding: 10px 8px;
       border-right: 1px solid #000;
       font-size: 11pt;
     }
@@ -524,7 +526,7 @@ function _injectPreviewStyles() {
       border-bottom: 1px solid #555;
       display: block;
       width: 100%;
-      height: 16px;
+      height: 26px;
     }
 
     /* Instructions */
