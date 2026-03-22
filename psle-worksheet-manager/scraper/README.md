@@ -51,7 +51,11 @@ node scrape-papers.js --level P6 --year 2025 --out p6-prelim-2025.json
 | `--type` | Prelim WA1 WA2 WA3 SA1 ALL | Prelim |
 | `--subject` | Maths English Science Chinese | Maths |
 | `--out` | any filename | auto (e.g. `p6-maths-prelim-2025.json`) |
+| `--model` | `claude-sonnet-4-6` or `claude-haiku-4-5-20251001` | sonnet |
+| `--exclude` | comma-separated school names | — |
+| `--force` | flag — re-scrape even if already in output file | off |
 | `--dry-run` | flag | off |
+| `--refine-diagrams` | flag | off |
 
 `--years` overrides `--year`. Range is inclusive: `--years 2022-2025` scrapes 2022, 2023, 2024, 2025.
 

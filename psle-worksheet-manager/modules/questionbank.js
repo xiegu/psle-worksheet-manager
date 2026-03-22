@@ -21,11 +21,11 @@ let _selected = new Set(); // set of composite keys "wsId::qId"
 // Entry point
 // ---------------------------------------------------------------------------
 
-function renderQuestionBank(container) {
+async function renderQuestionBank(container) {
   _selected.clear();
   // Reset hideTaken if no student is active so it doesn't silently filter
   if (!getActiveStudent()) _qbFilters.hideTaken = false;
-  const allQ = _getAllEnrichedQuestions();
+  const allQ = await _getAllEnrichedQuestions();
 
   container.innerHTML = `
     ${_htmlQBStatsBar(allQ)}
@@ -35,16 +35,16 @@ function renderQuestionBank(container) {
   `;
 
   _bindQBFilters();
-  _renderQBGrid();
+  await _renderQBGrid();
 }
 
 // ---------------------------------------------------------------------------
 // Data: extract all questions from all worksheets, tagged with parent metadata
 // ---------------------------------------------------------------------------
 
-function _getAllEnrichedQuestions() {
+async function _getAllEnrichedQuestions() {
   const result = [];
-  for (const ws of getAllWorksheets()) {
+  for (const ws of await getAllWorksheets()) {
     for (const q of (ws.questions || [])) {
       if (!q.id || !q.text) continue;
       result.push({
@@ -76,7 +76,7 @@ function _htmlQBStatsBar(allQ) {
       : "";
   }).filter(Boolean).join(" ");
 
-  const wsCount = new Set(allQ.map(q => q._wsId)).size;
+  const wsCount    = new Set(allQ.map(q => q._wsId)).size;
   const totalMarks = allQ.reduce((s, q) => s + (parseInt(q.marks) || 0), 0);
 
   return `
@@ -219,16 +219,16 @@ function _htmlSelectionBar(filteredCount) {
 // Grid
 // ---------------------------------------------------------------------------
 
-function _renderQBGrid() {
+async function _renderQBGrid() {
   const wrap   = document.getElementById("qb-grid-wrap");
   const selBar = document.getElementById("qb-selection-bar");
   if (!wrap || !selBar) return;
 
-  const allQ     = _getAllEnrichedQuestions();
+  const allQ     = await _getAllEnrichedQuestions();
   const filtered = _applyQBFilters(allQ);
 
   // Compute taken set once for badge rendering
-  const stu      = getActiveStudent();
+  const stu      = getActiveStudent();   // sync — cache
   const takenSet = stu ? new Set(stu.takenQuestions || []) : new Set();
 
   selBar.innerHTML = _htmlSelectionBar(filtered.length);
@@ -379,9 +379,9 @@ function _bindSelectionBar(filtered) {
     _renderQBGrid();
   });
 
-  document.getElementById("btn-build-from-bank")?.addEventListener("click", () => {
-    _markSelectedTaken();
-    _buildFromSelected();
+  document.getElementById("btn-build-from-bank")?.addEventListener("click", async () => {
+    await _markSelectedTaken();
+    await _buildFromSelected();
   });
 
   document.getElementById("btn-clear-selection")?.addEventListener("click", () => {
@@ -404,7 +404,7 @@ function _bindQBCardActions() {
   });
 
   // Button clicks
-  grid.addEventListener("click", e => {
+  grid.addEventListener("click", async e => {
     const btn = e.target.closest("button[data-key]");
     if (!btn) return;
     const key = btn.dataset.key;
@@ -412,18 +412,18 @@ function _bindQBCardActions() {
     if (btn.classList.contains("qb-btn-use")) {
       _selected.clear();
       _selected.add(key);
-      _markSelectedTaken();
-      _buildFromSelected();
+      await _markSelectedTaken();
+      await _buildFromSelected();
       return;
     }
 
     if (btn.classList.contains("qb-btn-preview")) {
-      _previewQuestion(key);
+      await _previewQuestion(key);
       return;
     }
 
     if (btn.classList.contains("qb-btn-edit")) {
-      _editQuestion(key);
+      await _editQuestion(key);
       return;
     }
   });
@@ -433,20 +433,20 @@ function _bindQBCardActions() {
 // Mark selected questions as taken (called before building)
 // ---------------------------------------------------------------------------
 
-function _markSelectedTaken() {
-  const stu = getActiveStudent();
+async function _markSelectedTaken() {
+  const stu = getActiveStudent();   // sync — cache
   if (!stu || _selected.size === 0) return;
-  markQuestionsTaken(stu.id, Array.from(_selected));
+  await markQuestionsTaken(stu.id, Array.from(_selected));
 }
 
 // ---------------------------------------------------------------------------
 // Build worksheet from selected questions
 // ---------------------------------------------------------------------------
 
-function _buildFromSelected() {
+async function _buildFromSelected() {
   if (_selected.size === 0) return;
 
-  const allQ      = _getAllEnrichedQuestions();
+  const allQ      = await _getAllEnrichedQuestions();
   const selectedQ = allQ.filter(q => _selected.has(q._key));
 
   // Strip internal _ws* fields and assign fresh IDs
@@ -481,8 +481,8 @@ function _buildFromSelected() {
 // Question preview modal
 // ---------------------------------------------------------------------------
 
-function _previewQuestion(key) {
-  const allQ = _getAllEnrichedQuestions();
+async function _previewQuestion(key) {
+  const allQ = await _getAllEnrichedQuestions();
   const q    = allQ.find(x => x._key === key);
   if (!q) return;
   _showQPreviewModal(q);
@@ -557,15 +557,14 @@ function _showQPreviewModal(q) {
   document.getElementById("qb-modal-cancel")?.addEventListener("click", close);
   modal.addEventListener("click", e => { if (e.target === modal) close(); });
 
-  document.getElementById("qb-modal-use")?.addEventListener("click", () => {
+  document.getElementById("qb-modal-use")?.addEventListener("click", async () => {
     close();
     _selected.clear();
     _selected.add(q._key);
-    _markSelectedTaken();
-    _buildFromSelected();
+    await _markSelectedTaken();
+    await _buildFromSelected();
   });
 
-  // Trap focus on close button
   document.getElementById("qb-modal-close")?.focus();
 }
 
@@ -573,8 +572,8 @@ function _showQPreviewModal(q) {
 // Edit question modal
 // ---------------------------------------------------------------------------
 
-function _editQuestion(key) {
-  const allQ = _getAllEnrichedQuestions();
+async function _editQuestion(key) {
+  const allQ = await _getAllEnrichedQuestions();
   const q    = allQ.find(x => x._key === key);
   if (!q) return;
   _showQEditModal(q);
@@ -664,7 +663,7 @@ function _showQEditModal(q) {
 
   if (hasDiagram) _setupCropCanvas(q.diagramImage);
 
-  document.getElementById("qb-edit-save")?.addEventListener("click", () => {
+  document.getElementById("qb-edit-save")?.addEventListener("click", async () => {
     const textEl   = document.getElementById("qb-edit-text");
     const canvas   = document.getElementById("qb-crop-canvas");
     const strandEl = document.getElementById("qb-edit-strand");
@@ -674,7 +673,7 @@ function _showQEditModal(q) {
     const newTopic  = topicEl?.value.trim()  || "";
     const newImage  = canvas?.dataset.pendingCrop || null;
 
-    const ws = getWorksheet(q._wsId);
+    const ws = await getWorksheet(q._wsId);
     if (!ws) { alert("Worksheet not found."); return; }
 
     const qIdx = (ws.questions || []).findIndex(x => x.id === q.id);
@@ -689,7 +688,7 @@ function _showQEditModal(q) {
     };
 
     try {
-      saveWorksheet(ws);
+      await saveWorksheet(ws);
       close();
       _renderQBGrid();
     } catch (err) {

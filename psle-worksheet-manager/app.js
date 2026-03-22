@@ -1,13 +1,13 @@
 // app.js
 // SPA router and global state management.
-// Coordinates navigation between Library and Builder views.
+// Coordinates navigation between Library, Builder, Preview, Question Bank, and Students views.
 
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
 const AppState = {
-  currentView:   "library",   // "library" | "builder" | "preview" | "questionbank"
+  currentView:   "library",   // "library" | "builder" | "preview" | "questionbank" | "students"
   editingId:     null,        // worksheet id being edited, or null for new
   bankQuestions: null,        // questions pre-loaded from Question Bank
   bankMeta:      null         // worksheet metadata pre-loaded from Question Bank
@@ -17,7 +17,7 @@ const AppState = {
 // Router
 // ---------------------------------------------------------------------------
 
-function navigate(view, params = {}) {
+async function navigate(view, params = {}) {
   AppState.currentView = view;
   AppState.editingId   = params.editingId || null;
 
@@ -26,23 +26,15 @@ function navigate(view, params = {}) {
     btn.classList.toggle("active", btn.dataset.view === view);
   });
 
-  // Render the requested view
   const main = document.getElementById("app-main");
   main.innerHTML = "";
 
-  if (view === "library") {
-    renderLibrary(main);
-  } else if (view === "builder") {
-    renderBuilder(main, AppState.editingId);
-  } else if (view === "preview") {
-    renderPreview(main, AppState.editingId);
-  } else if (view === "questionbank") {
-    renderQuestionBank(main);
-  } else if (view === "students") {
-    renderStudents(main);
-  }
+  if      (view === "library")      await renderLibrary(main);
+  else if (view === "builder")      await renderBuilder(main, AppState.editingId);
+  else if (view === "preview")      await renderPreview(main, AppState.editingId);
+  else if (view === "questionbank") await renderQuestionBank(main);
+  else if (view === "students")     await renderStudents(main);
 
-  // Scroll to top on navigation
   window.scrollTo(0, 0);
 }
 
@@ -51,9 +43,9 @@ function navigate(view, params = {}) {
 // ---------------------------------------------------------------------------
 
 function initExportImport() {
-  document.getElementById("btn-export").addEventListener("click", () => {
+  document.getElementById("btn-export").addEventListener("click", async () => {
     try {
-      exportAll();
+      await exportAll();
       showToast("Backup downloaded.");
     } catch (e) {
       showToast("Export failed: " + e.message, "error");
@@ -71,14 +63,14 @@ function initExportImport() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
+      showToast("Importing…");
       try {
-        const result = importAll(e.target.result);
+        const result = await importAll(e.target.result);
         showToast(`Imported ${result.imported} worksheet(s).`
-          + (result.skipped ? ` Skipped ${result.skipped}.` : ""));
-        // Refresh library if currently visible
+          + (result.skipped ? ` Skipped ${result.skipped}.` : ""), "success");
         if (AppState.currentView === "library") {
-          navigate("library");
+          await navigate("library");
         }
       } catch (err) {
         showToast("Import failed: " + err.message, "error");
@@ -120,7 +112,23 @@ window.navigate  = navigate;
 // Boot
 // ---------------------------------------------------------------------------
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  // Initialise IndexedDB (opens DB, migrates legacy localStorage data, primes cache)
+  try {
+    await initDB();
+  } catch (e) {
+    console.error("Failed to open IndexedDB:", e);
+    document.getElementById("app-main").innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state__icon">&#9888;</div>
+        <div class="empty-state__text">
+          Failed to open database: ${e.message}<br>
+          Try refreshing the page. If the problem persists, check that your browser supports IndexedDB.
+        </div>
+      </div>`;
+    return;
+  }
+
   // Wire nav buttons
   document.querySelectorAll(".nav-btn").forEach(btn => {
     btn.addEventListener("click", () => navigate(btn.dataset.view));
@@ -130,5 +138,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderActiveStudentIndicator();
 
   // Start on library view
-  navigate("library");
+  await navigate("library");
 });

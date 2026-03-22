@@ -17,9 +17,9 @@ let _pvWs      = null;    // worksheet being previewed
 // Entry point
 // ---------------------------------------------------------------------------
 
-function renderPreview(container, worksheetId) {
+async function renderPreview(container, worksheetId) {
   _pvTeacher = false;
-  _pvWs = worksheetId ? getWorksheet(worksheetId) : null;
+  _pvWs = worksheetId ? await getWorksheet(worksheetId) : null;
 
   if (!_pvWs) {
     container.innerHTML = `

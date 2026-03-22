@@ -14,7 +14,7 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 | `style.css` | Done | Full UI styles + `@media print` A4 output; student pill, taken badges, score section |
 | `app.js` | Done | Router — Library / Builder / Preview / Question Bank / Students views |
 | `data/syllabus.js` | Done | Full P1–P6 MOE 2021 taxonomy, 2026 flags, helper functions |
-| `modules/storage.js` | Done | localStorage CRUD, export/import JSON backup (v2: includes student data) |
+| `modules/storage.js` | Done | IndexedDB CRUD (replaces localStorage; auto-migrates existing data on first load), export/import JSON backup (v2: includes student data) |
 | `modules/library.js` | Done | Dashboard with 7 combinable filters, stats bar, card grid; taken badges + Record Score per active student |
 | `modules/builder.js` | Done | 3-step worksheet creator with live preview, drag-to-reorder questions; shows diagram thumbnails in question cards |
 | `modules/preview.js` | Done | Full A4 in-app preview, student/teacher toggle; shared `generateWorksheetHTML` / `openPrintWindow` used by all print paths; renders `diagramImage` |
@@ -26,7 +26,7 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 
 | File | Status | Description |
 |------|--------|-------------|
-| `scrape-papers.js` | Done | Downloads PDFs from sgtestpaper.com, sends to Claude Sonnet 4.6 for question extraction, outputs import-ready JSON; saves original PDF to `papers/` for audit; converts pages to JPEG via pdftoppm for diagram support |
+| `scrape-papers.js` | Done | Downloads PDFs from sgtestpaper.com, sends to Claude for question extraction, outputs import-ready JSON; saves original PDF to `papers/` for audit; converts pages to JPEG via pdftoppm for diagram support; skip-cache, blacklist, model, and refinement flags |
 | `p6-maths-prelim-2025.json` | Done | Scraped output (lowercase filename) — 60 questions, 23 with cropped diagram images, 100 marks |
 | `papers/` folder | Done | Audit folder — original PDF saved here automatically on each scraper run |
 | `README.md` | Done | Usage instructions, all CLI options, cost estimates |
@@ -50,6 +50,7 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 - **Card actions** — Preview, Edit, Duplicate, Archive/Restore
 - **Print** — A4 output via browser print dialog; student copy hides answers, teacher copy shows answer key + watermark
 - **Export/Import** — JSON backup and restore (v2 format includes student data) via header buttons
+- **IndexedDB storage** — worksheets and students stored in IndexedDB (no 5MB limit); existing localStorage data auto-migrated on first load; supports 1000+ papers (~700MB) with room to spare
 - **Student module** — add students, set active student, track taken questions per student, record scores per worksheet, view score history; active student shown in header pill
 - **Taken badges in Question Bank** — each question card shows a "Taken" badge when the active student has already received that question; "Hide taken" checkbox filter
 - **Taken labels on Library cards** — each card shows "All taken / X/Y taken / Not taken" status for the active student
@@ -58,6 +59,10 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 - **Diagram support** — `pdftoppm` converts PDF pages to JPEG; Claude returns `diagramBbox` coordinates; `sharp` crops each figure to a tight JPEG stored as `diagramImage` on the question; renders in Preview, print, builder card, live preview, and Question Bank modal
 - **Scraper output naming** — JSON files named by paper title (lowercase, e.g. `p6-maths-prelim-2025.json`) instead of generic `papers-output.json`
 - **Audit trail** — scraper saves the original PDF to `scraper/papers/` automatically on every run
+- **Scraper skip-cache** — already-scraped papers skipped by default on re-runs; `--force` to re-scrape all
+- **School blacklist** — PLMGS and RedSwastika permanently excluded; `--exclude School1,School2` for per-run exclusions
+- **Scraper model split** — main extraction uses Sonnet 4.6 by default (`--model` to override); diagram refinement pass uses Haiku 4.5 (cheaper, lower stakes)
+- **Diagram refinement opt-in** — pass 2 diagram re-crop disabled by default; enable with `--refine-diagrams`
 
 ### Scraper test result (confirmed working — with diagrams)
 ```
@@ -120,4 +125,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-21 — Student module (#6) implemented: student CRUD, taken-question tracking, score recording, library badges, QB taken badges + hide-taken filter; re-scraped Nanyang 2025 paper (23 diagrams); fixed export/import student data, score validation, stale hideTaken filter*
+*Last updated: 2026-03-22 — IndexedDB migration (no more 5MB localStorage limit; supports 1000+ papers); scraper: skip-cache + --force, school blacklist (PLMGS/RedSwastika) + --exclude, --model flag, Haiku for refinement pass, --refine-diagrams opt-in*

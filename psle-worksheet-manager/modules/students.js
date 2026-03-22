@@ -7,14 +7,22 @@
 // Entry point
 // ---------------------------------------------------------------------------
 
-function renderStudents(container) {
+async function renderStudents(container) {
+  // Pre-fetch all data needed for both panels
+  const students = await getAllStudents();
+  const activeId = getActiveStudentId();
+  const stu      = getActiveStudent();   // sync — memory cache
+
+  // Pre-fetch worksheets referenced in this student's score history
+  const wsMap = await _buildWsMap(stu);
+
   container.innerHTML = `
     <div class="student-panel-wrap">
       <div class="student-panel" id="student-left-panel">
-        ${_htmlStudentLeftPanel()}
+        ${_htmlStudentLeftPanel(students, activeId)}
       </div>
       <div class="student-detail" id="student-detail-panel">
-        ${_htmlStudentDetail()}
+        ${_htmlStudentDetail(stu, wsMap)}
       </div>
     </div>
   `;
@@ -22,14 +30,21 @@ function renderStudents(container) {
   _bindStudentDetail();
 }
 
+// Build a Map<wsId, worksheet> for the score table (avoids async calls inside HTML generators)
+async function _buildWsMap(stu) {
+  const wsMap = new Map();
+  if (!stu || !(stu.scores || []).length) return wsMap;
+  const wsIds   = [...new Set(stu.scores.map(s => s.wsId))];
+  const fetched = await Promise.all(wsIds.map(id => getWorksheet(id)));
+  wsIds.forEach((id, i) => { if (fetched[i]) wsMap.set(id, fetched[i]); });
+  return wsMap;
+}
+
 // ---------------------------------------------------------------------------
-// Left panel HTML — dropdown + add form
+// Left panel HTML — dropdown + add form (receives pre-fetched data)
 // ---------------------------------------------------------------------------
 
-function _htmlStudentLeftPanel() {
-  const students = getAllStudents();
-  const activeId = getActiveStudentId();
-
+function _htmlStudentLeftPanel(students, activeId) {
   return `
     <div class="builder-section__title">Students</div>
     <div class="form-group" style="margin-bottom:12px">
@@ -56,11 +71,10 @@ function _htmlStudentLeftPanel() {
 }
 
 // ---------------------------------------------------------------------------
-// Right panel HTML — detail / stats / score history
+// Right panel HTML — detail / stats / score history (receives pre-fetched data)
 // ---------------------------------------------------------------------------
 
-function _htmlStudentDetail() {
-  const stu = getActiveStudent();
+function _htmlStudentDetail(stu, wsMap) {
   if (!stu) {
     return `
       <div class="empty-state">
@@ -79,7 +93,7 @@ function _htmlStudentDetail() {
         <thead><tr><th>Worksheet</th><th>Score</th><th>Date</th></tr></thead>
         <tbody>
           ${allScores.map(sc => {
-            const ws      = getWorksheet(sc.wsId);
+            const ws      = wsMap.get(sc.wsId);
             const wsTitle = ws
               ? _escStu(ws.title || "Untitled")
               : `<em style="color:var(--grey-400)">${_escStu(sc.wsId)}</em>`;
@@ -120,36 +134,36 @@ function _htmlStudentDetail() {
 // ---------------------------------------------------------------------------
 
 function _bindStudentLeftPanel() {
-  document.getElementById("btn-stu-set-active")?.addEventListener("click", () => {
+  document.getElementById("btn-stu-set-active")?.addEventListener("click", async () => {
     const id = document.getElementById("stu-select")?.value || "";
     if (!id) { showToast("Select a student first.", "error"); return; }
-    setActiveStudentId(id);
+    await setActiveStudentId(id);
     renderActiveStudentIndicator();
-    _refreshStudentDetail();
+    await _refreshStudentDetail();
     showToast("Student set as active.", "success");
   });
 
-  document.getElementById("btn-stu-logout")?.addEventListener("click", () => {
-    setActiveStudentId(null);
+  document.getElementById("btn-stu-logout")?.addEventListener("click", async () => {
+    await setActiveStudentId(null);
     renderActiveStudentIndicator();
-    _refreshStudentDetail();
+    await _refreshStudentDetail();
     showToast("Logged out.");
   });
 
-  document.getElementById("btn-stu-add")?.addEventListener("click", () => {
+  document.getElementById("btn-stu-add")?.addEventListener("click", async () => {
     const nameInput = document.getElementById("stu-new-name");
     const name = nameInput?.value.trim();
     if (!name) { showToast("Enter a student name.", "error"); return; }
 
-    const existing = getAllStudents();
+    const existing = await getAllStudents();
     if (existing.some(s => s.name.toLowerCase() === name.toLowerCase())) {
       showToast("A student with that name already exists.", "error");
       return;
     }
 
-    saveStudent({ name, takenQuestions: [], scores: [] });
+    await saveStudent({ name, takenQuestions: [], scores: [] });
     if (nameInput) nameInput.value = "";
-    _refreshStudentLeftPanel();
+    await _refreshStudentLeftPanel();
     showToast(`Student "${name}" added.`, "success");
   });
 }
@@ -159,29 +173,29 @@ function _bindStudentLeftPanel() {
 // ---------------------------------------------------------------------------
 
 function _bindStudentDetail() {
-  document.getElementById("btn-stu-clear-taken")?.addEventListener("click", () => {
+  document.getElementById("btn-stu-clear-taken")?.addEventListener("click", async () => {
     const stu = getActiveStudent();
     if (!stu) return;
     if (!confirm(`Clear all taken question history for ${stu.name}?`)) return;
     stu.takenQuestions = [];
-    saveStudent(stu);
-    _refreshStudentDetail();
+    await saveStudent(stu);
+    await _refreshStudentDetail();
     showToast("Taken history cleared.");
   });
 
-  document.getElementById("btn-stu-delete")?.addEventListener("click", () => {
+  document.getElementById("btn-stu-delete")?.addEventListener("click", async () => {
     const stu = getActiveStudent();
     if (!stu) return;
     if (!confirm(`Delete student "${stu.name}"? This cannot be undone.`)) return;
-    const name     = stu.name;
+    const name      = stu.name;
     const wasActive = getActiveStudentId() === stu.id;
-    deleteStudent(stu.id);
+    await deleteStudent(stu.id);
     if (wasActive) {
-      setActiveStudentId(null);
+      await setActiveStudentId(null);
       renderActiveStudentIndicator();
     }
-    _refreshStudentLeftPanel();
-    _refreshStudentDetail();
+    await _refreshStudentLeftPanel();
+    await _refreshStudentDetail();
     showToast(`Student "${name}" deleted.`);
   });
 }
@@ -190,17 +204,21 @@ function _bindStudentDetail() {
 // Refresh helpers
 // ---------------------------------------------------------------------------
 
-function _refreshStudentLeftPanel() {
-  const panel = document.getElementById("student-left-panel");
+async function _refreshStudentLeftPanel() {
+  const students = await getAllStudents();
+  const activeId = getActiveStudentId();
+  const panel    = document.getElementById("student-left-panel");
   if (!panel) return;
-  panel.innerHTML = _htmlStudentLeftPanel();
+  panel.innerHTML = _htmlStudentLeftPanel(students, activeId);
   _bindStudentLeftPanel();
 }
 
-function _refreshStudentDetail() {
+async function _refreshStudentDetail() {
+  const stu   = getActiveStudent();
+  const wsMap = await _buildWsMap(stu);
   const panel = document.getElementById("student-detail-panel");
   if (!panel) return;
-  panel.innerHTML = _htmlStudentDetail();
+  panel.innerHTML = _htmlStudentDetail(stu, wsMap);
   _bindStudentDetail();
 }
 
@@ -211,7 +229,7 @@ function _refreshStudentDetail() {
 function renderActiveStudentIndicator() {
   const container = document.getElementById("active-student-indicator");
   if (!container) return;
-  const stu = getActiveStudent();
+  const stu = getActiveStudent();   // sync — cache
   if (stu) {
     container.innerHTML = `<div class="active-student-pill">&#128100; ${_escStu(stu.name)}</div>`;
   } else {

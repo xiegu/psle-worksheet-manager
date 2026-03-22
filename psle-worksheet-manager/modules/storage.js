@@ -1,180 +1,242 @@
 // modules/storage.js
-// localStorage CRUD helpers for worksheet persistence.
-// All modules must go through these functions — never call localStorage directly.
+// IndexedDB storage layer for worksheet and student persistence.
+// All modules must go through these functions — never access IDB or localStorage directly.
+//
+// Async functions: getAllWorksheets, getWorksheet, saveWorksheet, deleteWorksheet,
+//   archiveWorksheet, unarchiveWorksheet, exportAll, importAll, clearAll,
+//   getAllStudents, getStudent, saveStudent, deleteStudent,
+//   setActiveStudentId, markQuestionsTaken, recordScore
+//
+// Sync functions (memory cache / localStorage):
+//   getActiveStudentId, getActiveStudent, getScoresForWorksheet
 
-const STORAGE_KEY = "psle_worksheets";
+const DB_NAME    = "psle_db";
+const DB_VERSION = 1;
+const WS_STORE   = "worksheets";
+const STU_STORE  = "students";
+
+const ACTIVE_STUDENT_KEY = "psle_active_student";
+
+// Legacy localStorage keys — used only for one-time migration
+const LS_WS_KEY  = "psle_worksheets";
+const LS_STU_KEY = "psle_students";
+
+let _db = null;
+let _cachedActiveStudent = null;   // kept in sync with every saveStudent / deleteStudent call
 
 // ---------------------------------------------------------------------------
-// Internal helpers
+// DB init — call once at app boot, before any other storage call
 // ---------------------------------------------------------------------------
 
-function _load() {
+function _openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(WS_STORE)) {
+        db.createObjectStore(WS_STORE, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(STU_STORE)) {
+        db.createObjectStore(STU_STORE, { keyPath: "id" });
+      }
+    };
+
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = e => reject(e.target.error);
+  });
+}
+
+/**
+ * Open IndexedDB, migrate any existing localStorage data, and prime the
+ * active-student cache. Must be awaited before any other storage call.
+ */
+async function initDB() {
+  _db = await _openDB();
+  await _migrateFromLocalStorage();
+  const activeId = localStorage.getItem(ACTIVE_STUDENT_KEY);
+  if (activeId) _cachedActiveStudent = await getStudent(activeId);
+}
+
+// One-time migration: if IDB is empty but localStorage has data, move it over.
+async function _migrateFromLocalStorage() {
+  const existing = await getAllWorksheets();
+  if (existing.length > 0) return;   // IDB already has data — skip
+
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const wsRaw  = localStorage.getItem(LS_WS_KEY);
+    const stuRaw = localStorage.getItem(LS_STU_KEY);
+
+    if (wsRaw) {
+      const wsList = JSON.parse(wsRaw);
+      if (Array.isArray(wsList) && wsList.length > 0) {
+        const tx = _db.transaction(WS_STORE, "readwrite");
+        const st = tx.objectStore(WS_STORE);
+        for (const ws of wsList) { if (ws.id) st.put(ws); }
+        await _txDone(tx);
+        console.log(`[storage] Migrated ${wsList.length} worksheets from localStorage → IndexedDB`);
+        localStorage.removeItem(LS_WS_KEY);
+      }
+    }
+
+    if (stuRaw) {
+      const stuList = JSON.parse(stuRaw);
+      if (Array.isArray(stuList) && stuList.length > 0) {
+        const tx = _db.transaction(STU_STORE, "readwrite");
+        const st = tx.objectStore(STU_STORE);
+        for (const s of stuList) { if (s.id) st.put(s); }
+        await _txDone(tx);
+        console.log(`[storage] Migrated ${stuList.length} students from localStorage → IndexedDB`);
+        localStorage.removeItem(LS_STU_KEY);
+      }
+    }
   } catch (e) {
-    console.error("storage: failed to parse localStorage data", e);
-    return [];
+    console.warn("[storage] localStorage migration failed (non-fatal):", e.message);
   }
 }
 
-function _save(worksheets) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(worksheets));
-  } catch (e) {
-    console.error("storage: failed to write to localStorage", e);
-    throw new Error("Could not save — storage may be full.");
-  }
+// ---------------------------------------------------------------------------
+// Low-level IDB helpers
+// ---------------------------------------------------------------------------
+
+function _txDone(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = resolve;
+    tx.onerror    = () => reject(tx.error);
+    tx.onabort    = () => reject(tx.error);
+  });
+}
+
+function _storeGet(storeName, key) {
+  return new Promise((resolve, reject) => {
+    const req = _db.transaction(storeName, "readonly").objectStore(storeName).get(key);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+function _storeGetAll(storeName) {
+  return new Promise((resolve, reject) => {
+    const req = _db.transaction(storeName, "readonly").objectStore(storeName).getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function _storePut(storeName, record) {
+  const tx = _db.transaction(storeName, "readwrite");
+  tx.objectStore(storeName).put(record);
+  await _txDone(tx);
+}
+
+async function _storeDelete(storeName, key) {
+  const tx = _db.transaction(storeName, "readwrite");
+  tx.objectStore(storeName).delete(key);
+  await _txDone(tx);
 }
 
 function _today() {
-  return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+  return new Date().toISOString().slice(0, 10);
 }
 
 // ---------------------------------------------------------------------------
-// CRUD
+// Worksheet CRUD
 // ---------------------------------------------------------------------------
+
+/** @returns {Promise<object[]>} All worksheets sorted by updatedAt descending */
+async function getAllWorksheets() {
+  const all = await _storeGetAll(WS_STORE);
+  return all.sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+}
+
+/** @returns {Promise<object|null>} */
+async function getWorksheet(id) {
+  return _storeGet(WS_STORE, id);
+}
 
 /**
  * Create or update a worksheet.
- * If ws.id exists in storage, it is replaced (version incremented, updatedAt refreshed).
- * If ws.id is absent or not found, a new record is created with a generated id.
- * @param {object} ws - Worksheet object (partial or full)
- * @returns {object} The saved worksheet with id, createdAt, updatedAt, version set
+ * @returns {Promise<object>} The saved worksheet
  */
-function saveWorksheet(ws) {
-  const worksheets = _load();
+async function saveWorksheet(ws) {
   const now = _today();
 
   if (ws.id) {
-    const idx = worksheets.findIndex(w => w.id === ws.id);
-    if (idx !== -1) {
-      const existing = worksheets[idx];
-      const updated = {
-        ...existing,
-        ...ws,
-        updatedAt: now,
-        version: (existing.version || 1) + 1
-      };
-      worksheets[idx] = updated;
-      _save(worksheets);
+    const existing = await getWorksheet(ws.id);
+    if (existing) {
+      const updated = { ...existing, ...ws, updatedAt: now, version: (existing.version || 1) + 1 };
+      await _storePut(WS_STORE, updated);
       return updated;
     }
   }
 
-  // New worksheet
   const created = {
-    title: "",
-    level: "",
-    strand: "",
-    topic: "",
-    difficulty: "Standard",
-    type: "Practice",
-    version: 1,
-    status: "active",
-    questions: [],
-    notes: "",
+    title: "", level: "", strand: "", topic: "",
+    difficulty: "Standard", type: "Practice",
+    version: 1, status: "active", questions: [], notes: "",
     ...ws,
-    id: "ws_" + Date.now(),
+    id:        "ws_" + Date.now(),
     createdAt: now,
     updatedAt: now
   };
-  worksheets.push(created);
-  _save(worksheets);
+  await _storePut(WS_STORE, created);
   return created;
 }
 
-/**
- * Retrieve a single worksheet by id.
- * @param {string} id
- * @returns {object|null}
- */
-function getWorksheet(id) {
-  return _load().find(w => w.id === id) || null;
-}
-
-/**
- * Retrieve all worksheets, sorted by updatedAt descending (most recent first).
- * @returns {object[]}
- */
-function getAllWorksheets() {
-  return _load().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-}
-
-/**
- * Permanently delete a worksheet by id.
- * @param {string} id
- * @returns {boolean} true if deleted, false if not found
- */
-function deleteWorksheet(id) {
-  const worksheets = _load();
-  const idx = worksheets.findIndex(w => w.id === id);
-  if (idx === -1) return false;
-  worksheets.splice(idx, 1);
-  _save(worksheets);
+/** @returns {Promise<boolean>} */
+async function deleteWorksheet(id) {
+  const existing = await getWorksheet(id);
+  if (!existing) return false;
+  await _storeDelete(WS_STORE, id);
   return true;
 }
 
-/**
- * Soft-delete: set status to "archived".
- * @param {string} id
- * @returns {object|null} Updated worksheet, or null if not found
- */
-function archiveWorksheet(id) {
-  const worksheets = _load();
-  const idx = worksheets.findIndex(w => w.id === id);
-  if (idx === -1) return null;
-  worksheets[idx] = { ...worksheets[idx], status: "archived", updatedAt: _today() };
-  _save(worksheets);
-  return worksheets[idx];
+/** @returns {Promise<object|null>} */
+async function archiveWorksheet(id) {
+  const ws = await getWorksheet(id);
+  if (!ws) return null;
+  const updated = { ...ws, status: "archived", updatedAt: _today() };
+  await _storePut(WS_STORE, updated);
+  return updated;
 }
 
-/**
- * Restore an archived worksheet back to active.
- * @param {string} id
- * @returns {object|null} Updated worksheet, or null if not found
- */
-function unarchiveWorksheet(id) {
-  const worksheets = _load();
-  const idx = worksheets.findIndex(w => w.id === id);
-  if (idx === -1) return null;
-  worksheets[idx] = { ...worksheets[idx], status: "active", updatedAt: _today() };
-  _save(worksheets);
-  return worksheets[idx];
+/** @returns {Promise<object|null>} */
+async function unarchiveWorksheet(id) {
+  const ws = await getWorksheet(id);
+  if (!ws) return null;
+  const updated = { ...ws, status: "active", updatedAt: _today() };
+  await _storePut(WS_STORE, updated);
+  return updated;
 }
 
 // ---------------------------------------------------------------------------
-// Export / Import (data portability)
+// Export / Import
 // ---------------------------------------------------------------------------
 
-/**
- * Download all worksheets as a JSON backup file.
- * Triggers a browser file download — no return value.
- */
-function exportAll() {
+/** Triggers a browser download of all data as a JSON backup file. */
+async function exportAll() {
   const data = {
     exportedAt: new Date().toISOString(),
-    version: 2,
-    worksheets: _load(),
-    students:   _loadStudents()
+    version:    2,
+    worksheets: await getAllWorksheets(),
+    students:   await getAllStudents()
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
   a.download = "psle-worksheets-backup-" + _today() + ".json";
   a.click();
   URL.revokeObjectURL(url);
 }
 
 /**
- * Restore worksheets from a JSON backup.
- * Merges by id: imported records overwrite existing ones with the same id;
- * new ids are appended. Existing worksheets not in the import are kept.
- * @param {string} jsonString - Raw JSON string from a backup file
- * @returns {{ imported: number, skipped: number }} Result summary
+ * Restore from a JSON backup. Merges by id (imported records overwrite existing
+ * ones with the same id; existing records not in the import are kept).
+ * @param {string} jsonString
+ * @returns {Promise<{imported: number, skipped: number}>}
  */
-function importAll(jsonString) {
+async function importAll(jsonString) {
   let parsed;
   try {
     parsed = JSON.parse(jsonString);
@@ -187,166 +249,168 @@ function importAll(jsonString) {
     throw new Error("Invalid backup format — expected a worksheets array.");
   }
 
-  const existing = _load();
+  const existing    = await getAllWorksheets();
   const existingMap = new Map(existing.map(w => [w.id, w]));
 
-  let imported = 0;
-  let skipped = 0;
-
+  let imported = 0, skipped = 0;
   for (const ws of incoming) {
     if (!ws.id || !ws.title) { skipped++; continue; }
     existingMap.set(ws.id, ws);
     imported++;
   }
 
-  _save(Array.from(existingMap.values()));
+  const tx = _db.transaction(WS_STORE, "readwrite");
+  const st = tx.objectStore(WS_STORE);
+  for (const ws of existingMap.values()) { st.put(ws); }
+  await _txDone(tx);
 
-  // Merge student data if present (v2+ backups)
+  // Merge student data (v2+ backups)
   if (Array.isArray(parsed.students)) {
-    const existingStudents = _loadStudents();
+    const existingStudents = await getAllStudents();
     const studentMap = new Map(existingStudents.map(s => [s.id, s]));
     for (const stu of parsed.students) {
       if (!stu.id || !stu.name) continue;
       studentMap.set(stu.id, stu);
     }
-    _saveStudents(Array.from(studentMap.values()));
+    const stuTx = _db.transaction(STU_STORE, "readwrite");
+    const stuSt = stuTx.objectStore(STU_STORE);
+    for (const s of studentMap.values()) { stuSt.put(s); }
+    await _txDone(stuTx);
   }
 
   return { imported, skipped };
 }
 
-/**
- * Wipe all worksheets from storage. Use with caution.
- */
-function clearAll() {
-  localStorage.removeItem(STORAGE_KEY);
+/** Wipe all worksheets from IDB. Use with caution. */
+async function clearAll() {
+  const tx = _db.transaction(WS_STORE, "readwrite");
+  tx.objectStore(WS_STORE).clear();
+  await _txDone(tx);
 }
 
 // ---------------------------------------------------------------------------
-// Student CRUD helpers
+// Student CRUD
 // ---------------------------------------------------------------------------
 
-const STUDENTS_KEY      = "psle_students";
-const ACTIVE_STUDENT_KEY = "psle_active_student";
-
-function _loadStudents() {
-  try {
-    const raw = localStorage.getItem(STUDENTS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) {
-    console.error("storage: failed to parse students data", e);
-    return [];
-  }
+/** @returns {Promise<object[]>} All students sorted by name */
+async function getAllStudents() {
+  const all = await _storeGetAll(STU_STORE);
+  return all.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 }
 
-function _saveStudents(arr) {
-  try {
-    localStorage.setItem(STUDENTS_KEY, JSON.stringify(arr));
-  } catch (e) {
-    console.error("storage: failed to write students", e);
-    throw new Error("Could not save students — storage may be full.");
-  }
-}
-
-/** @returns {object[]} All students sorted by name */
-function getAllStudents() {
-  return _loadStudents().sort((a, b) => a.name.localeCompare(b.name));
-}
-
-/** @returns {object|null} */
-function getStudent(id) {
+/** @returns {Promise<object|null>} */
+async function getStudent(id) {
   if (!id) return null;
-  return _loadStudents().find(s => s.id === id) || null;
+  return _storeGet(STU_STORE, id);
 }
 
 /**
- * Create or update a student.
- * @param {object} student
- * @returns {object} saved student
+ * Create or update a student. Also keeps _cachedActiveStudent in sync.
+ * @returns {Promise<object>} The saved student
  */
-function saveStudent(student) {
-  const students = _loadStudents();
+async function saveStudent(student) {
   const now = _today();
 
   if (student.id) {
-    const idx = students.findIndex(s => s.id === student.id);
-    if (idx !== -1) {
-      students[idx] = { ...students[idx], ...student };
-      _saveStudents(students);
-      return students[idx];
+    const existing = await getStudent(student.id);
+    if (existing) {
+      const updated = { ...existing, ...student };
+      await _storePut(STU_STORE, updated);
+      if (_cachedActiveStudent && _cachedActiveStudent.id === updated.id) {
+        _cachedActiveStudent = updated;
+      }
+      return updated;
     }
   }
 
-  // New student
   const created = {
-    name: "",
-    takenQuestions: [],
-    scores: [],
+    name: "", takenQuestions: [], scores: [],
     ...student,
-    id: "stu_" + Date.now(),
+    id:        "stu_" + Date.now(),
     createdAt: now
   };
-  students.push(created);
-  _saveStudents(students);
+  await _storePut(STU_STORE, created);
   return created;
 }
 
-/** @returns {boolean} */
-function deleteStudent(id) {
-  const students = _loadStudents();
-  const idx = students.findIndex(s => s.id === id);
-  if (idx === -1) return false;
-  students.splice(idx, 1);
-  _saveStudents(students);
+/** @returns {Promise<boolean>} */
+async function deleteStudent(id) {
+  const existing = await getStudent(id);
+  if (!existing) return false;
+  await _storeDelete(STU_STORE, id);
+  if (_cachedActiveStudent && _cachedActiveStudent.id === id) {
+    _cachedActiveStudent = null;
+  }
   return true;
 }
+
+// ---------------------------------------------------------------------------
+// Active student
+// Active student ID is stored in localStorage (tiny string, no size concern).
+// The active student object is kept in a memory cache for sync access by
+// HTML generators that cannot be made async.
+// ---------------------------------------------------------------------------
 
 /** @returns {string|null} */
 function getActiveStudentId() {
   return localStorage.getItem(ACTIVE_STUDENT_KEY) || null;
 }
 
-function setActiveStudentId(id) {
-  if (id) localStorage.setItem(ACTIVE_STUDENT_KEY, id);
-  else    localStorage.removeItem(ACTIVE_STUDENT_KEY);
-}
-
-/** @returns {object|null} */
-function getActiveStudent() {
-  return getStudent(getActiveStudentId());
+/**
+ * Set (or clear) the active student. Updates localStorage and memory cache.
+ * @returns {Promise<void>}
+ */
+async function setActiveStudentId(id) {
+  if (id) {
+    localStorage.setItem(ACTIVE_STUDENT_KEY, id);
+    _cachedActiveStudent = await getStudent(id);
+  } else {
+    localStorage.removeItem(ACTIVE_STUDENT_KEY);
+    _cachedActiveStudent = null;
+  }
 }
 
 /**
- * Append composite keys to a student's takenQuestions (deduped).
- * @param {string} studentId
- * @param {string[]} keys  e.g. ["wsId::qId", ...]
+ * Sync — returns the cached active student object (or null).
+ * Always reflects the latest saved state because saveStudent keeps the cache
+ * in sync and setActiveStudentId refreshes it on change.
+ * @returns {object|null}
  */
-function markQuestionsTaken(studentId, keys) {
-  const student = getStudent(studentId);
+function getActiveStudent() {
+  return _cachedActiveStudent;
+}
+
+// ---------------------------------------------------------------------------
+// Taken questions & scores
+// ---------------------------------------------------------------------------
+
+/** @returns {Promise<void>} */
+async function markQuestionsTaken(studentId, keys) {
+  const student = await getStudent(studentId);
   if (!student) return;
   const existing = new Set(student.takenQuestions || []);
   keys.forEach(k => existing.add(k));
   student.takenQuestions = Array.from(existing);
-  saveStudent(student);
+  await saveStudent(student);
 }
 
-/**
- * Push a score entry to a student's scores array.
- */
-function recordScore(studentId, wsId, score, total, date) {
-  const student = getStudent(studentId);
+/** @returns {Promise<void>} */
+async function recordScore(studentId, wsId, score, total, date) {
+  const student = await getStudent(studentId);
   if (!student) return;
   if (!student.scores) student.scores = [];
   student.scores.push({ wsId, score, total, date });
-  saveStudent(student);
+  await saveStudent(student);
 }
 
 /**
- * @returns {object[]} Score entries for a given worksheet, newest first.
+ * Sync — filters scores from the cached active student.
+ * Only call with the active student's id (the cache only holds the active student).
+ * @returns {object[]}
  */
 function getScoresForWorksheet(studentId, wsId) {
-  const student = getStudent(studentId);
-  if (!student) return [];
+  const student = _cachedActiveStudent;
+  if (!student || student.id !== studentId) return [];
   return (student.scores || [])
     .filter(s => s.wsId === wsId)
     .sort((a, b) => b.date.localeCompare(a.date));

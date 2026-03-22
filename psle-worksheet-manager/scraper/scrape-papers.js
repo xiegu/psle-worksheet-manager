@@ -15,8 +15,12 @@
 //   --school   Nanyang | Raffles | Rosyth | ... | ALL    (default: ALL)
 //   --type     Prelim | WA1 | WA2 | WA3 | SA1 | ALL     (default: Prelim)
 //   --subject  Maths | English | Science | Chinese        (default: Maths)
-//   --out      output filename                            (default: auto-generated)
-//   --dry-run  List papers that would be scraped, then exit
+//   --out              output filename                            (default: auto-generated)
+//   --model            claude-sonnet-4-6 | claude-haiku-4-5-20251001  (default: sonnet, for main extraction)
+//   --exclude          Comma-separated schools to skip for this run (e.g. Raffles,MGS)
+//   --force            Re-scrape all papers even if already in the output file
+//   --dry-run          List papers that would be scraped, then exit
+//   --refine-diagrams  Second-pass Claude crop to tighten diagram boundaries (off by default)
 //
 // Examples:
 //   node scrape-papers.js --level P6 --year 2025 --school Nanyang
@@ -46,7 +50,12 @@ const YEARS   = parseYears(args.years, args.year);
 const SCHOOL  = (args.school  || "ALL").trim();
 const TYPE    = (args.type    || "Prelim").trim();
 const SUBJECT = capitalise(args.subject || "Maths");
-const DRY_RUN = args["dry-run"] === true;
+const DRY_RUN        = args["dry-run"] === true;
+const REFINE         = args["refine-diagrams"] === true;
+const FORCE          = args["force"] === true;
+const EXTRACT_MODEL  = args.model || "claude-sonnet-4-6";
+const REFINE_MODEL   = "claude-haiku-4-5-20251001";
+const EXCLUDE = args.exclude ? args.exclude.split(",").map(s => s.trim()) : [];
 const OUT_FILE = args.out || autoOutFile(LEVEL, SUBJECT, YEARS, TYPE, SCHOOL);
 
 function parseYears(yearsArg, yearArg) {
@@ -318,7 +327,7 @@ async function refineDiagramCrop(client, imageDataUrl) {
   let bbox;
   try {
     const resp = await client.messages.create({
-      model:      "claude-sonnet-4-6",
+      model:      REFINE_MODEL,
       max_tokens: 150,
       messages: [{
         role: "user",
@@ -368,6 +377,20 @@ async function main() {
   log(`   Output: ${OUT_FILE}\n`);
 
   const client     = new Anthropic.default({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+  // Load existing output file to skip already-scraped papers
+  let existingWorksheets = [];
+  if (!FORCE && fs.existsSync(OUT_FILE)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(OUT_FILE, "utf8"));
+      existingWorksheets = existing.worksheets || [];
+      log(`📂 Found existing output (${existingWorksheets.length} worksheet(s)) — already-scraped papers will be skipped. Use --force to re-scrape all.\n`);
+    } catch (e) {
+      log(`⚠️  Could not read existing ${OUT_FILE} (${e.message}) — starting fresh.\n`);
+    }
+  }
+  const existingTitles = new Set(existingWorksheets.map(w => w.title));
+
   const worksheets = [];
 
   for (const year of YEARS) {
@@ -392,6 +415,11 @@ async function main() {
       const paper = papers[i];
       log(`\n[${i+1}/${papers.length}] Processing: ${paper.title}`);
 
+      if (existingTitles.has(paper.title)) {
+        log(`   ⏭️  Already scraped — skipping (use --force to re-scrape)`);
+        continue;
+      }
+
       try {
         const worksheet = await processPaper(client, paper);
         worksheets.push(worksheet);
@@ -410,21 +438,28 @@ async function main() {
     process.exit(0);
   }
 
-  if (worksheets.length === 0) {
+  const allWorksheets = [...existingWorksheets, ...worksheets];
+
+  if (allWorksheets.length === 0) {
     log("\n⚠️  No worksheets extracted. Nothing saved.");
     process.exit(0);
   }
 
-  // 3. Save output
+  if (worksheets.length === 0) {
+    log("\n✅ All papers already scraped — nothing new to save.");
+    process.exit(0);
+  }
+
+  // 3. Save output (merge existing + newly scraped)
   const output = {
     exportedAt: new Date().toISOString(),
     version:    1,
     source:     "sgtestpaper.com",
-    worksheets
+    worksheets: allWorksheets
   };
 
   fs.writeFileSync(OUT_FILE, JSON.stringify(output, null, 2));
-  log(`\n✅ Done! Saved ${worksheets.length} worksheet(s) to ${OUT_FILE}`);
+  log(`\n✅ Done! Saved ${worksheets.length} new + ${existingWorksheets.length} existing = ${allWorksheets.length} total worksheet(s) to ${OUT_FILE}`);
   log(`\n👉 To import: open your Worksheet Manager app → click "↑ Import" → select ${OUT_FILE}\n`);
 }
 
@@ -502,6 +537,9 @@ async function buildPdfUrl(pageUrl, level, year, school, type, subject) {
   return pdfUrl(level, year, school, type, subject);
 }
 
+// Schools permanently excluded from all scraping runs
+const SCHOOL_BLACKLIST = ["PLMGS", "RedSwastika"];
+
 // Known schools for pattern-based fallback
 const KNOWN_SCHOOLS = [
   "Nanyang", "Raffles", "Rosyth", "TaoNan", "ACSJ", "AiTong",
@@ -512,7 +550,9 @@ const KNOWN_TYPES = ["Prelim", "WA1", "WA2", "WA3", "SA1"];
 function buildPapersFromPattern(level, year, schoolFilter, typeFilter, subject) {
   const subj    = SUBJECT_CONFIG[subject] || SUBJECT_CONFIG.Maths;
   const papers  = [];
-  const schools = schoolFilter === "ALL" ? KNOWN_SCHOOLS : [schoolFilter];
+  const excluded = [...SCHOOL_BLACKLIST, ...EXCLUDE];
+  const schools = (schoolFilter === "ALL" ? KNOWN_SCHOOLS : [schoolFilter])
+    .filter(s => !excluded.includes(s));
   const types   = typeFilter   === "ALL" ? KNOWN_TYPES   : [typeFilter];
 
   for (const s of schools) {
@@ -575,7 +615,7 @@ async function processPaper(client, paper) {
   }
 
   const response = await client.messages.create({
-    model:      "claude-sonnet-4-6",
+    model:      EXTRACT_MODEL,
     max_tokens: 16000,
     messages: [
       {
@@ -634,7 +674,7 @@ async function processPaper(client, paper) {
       if (pageSrc) {
         if (q.diagramBbox && typeof q.diagramBbox.x === "number") {
           const initialCrop = await cropDiagram(pageSrc, q.diagramBbox);
-          mapped.diagramImage = await refineDiagramCrop(client, initialCrop);
+          mapped.diagramImage = REFINE ? await refineDiagramCrop(client, initialCrop) : initialCrop;
         } else {
           mapped.diagramImage = pageSrc;
         }

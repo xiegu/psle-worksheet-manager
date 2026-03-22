@@ -15,9 +15,9 @@ let _dragSrcIdx = null;    // drag-and-drop source index
 // Entry point
 // ---------------------------------------------------------------------------
 
-function renderBuilder(container, editingId) {
+async function renderBuilder(container, editingId) {
   if (editingId) {
-    const ws = getWorksheet(editingId);
+    const ws = await getWorksheet(editingId);
     if (ws) {
       _draft     = { ...ws };
       _questions = ws.questions.map(q => ({ ...q }));
@@ -576,7 +576,7 @@ function _bindActionBar() {
     navigate("library");
   });
 
-  document.getElementById("btn-save")?.addEventListener("click", () => {
+  document.getElementById("btn-save")?.addEventListener("click", async () => {
     if (!_validate()) return;
 
     const ws = {
@@ -585,7 +585,7 @@ function _bindActionBar() {
     };
 
     try {
-      saveWorksheet(ws);
+      await saveWorksheet(ws);
       showToast("Worksheet saved.", "success");
       navigate("library");
     } catch (e) {
