@@ -821,12 +821,13 @@ async function _showQBPickerModal() {
     const toAdd = allQ.filter(q => pickedKeys.has(q._key));
     toAdd.forEach(q => {
       const newQ = {
-        id:      _newQId(),
-        type:    q.type,
-        text:    q.text,
-        marks:   q.marks,
-        answer:  q.answer  || "",
-        working: q.working || ""
+        id:        _newQId(),
+        type:      q.type,
+        text:      q.text,
+        marks:     q.marks,
+        answer:    q.answer  || "",
+        working:   q.working || "",
+        sourceKey: q._key          // track which source paper question this came from
       };
       if (q.type === "mcq" && q.options) newQ.options = [...q.options];
       if (q.diagramImage) newQ.diagramImage = q.diagramImage;

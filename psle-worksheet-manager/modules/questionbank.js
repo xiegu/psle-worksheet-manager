@@ -458,12 +458,13 @@ async function _buildFromSelected() {
   // Strip internal _ws* fields and assign fresh IDs
   const questions = selectedQ.map(q => {
     const clean = {
-      id:      "q_" + Date.now() + "_" + Math.floor(Math.random() * 1e6),
-      type:    q.type,
-      text:    q.text,
-      marks:   q.marks,
-      answer:  q.answer  || "",
-      working: q.working || ""
+      id:        "q_" + Date.now() + "_" + Math.floor(Math.random() * 1e6),
+      type:      q.type,
+      text:      q.text,
+      marks:     q.marks,
+      answer:    q.answer  || "",
+      working:   q.working || "",
+      sourceKey: q._key          // track which source paper question this came from
     };
     if (q.type === "mcq" && q.options) clean.options = [...q.options];
     if (q.diagramImage) clean.diagramImage = q.diagramImage;

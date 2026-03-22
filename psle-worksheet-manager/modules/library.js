@@ -228,10 +228,18 @@ function _applyFilters(list, filters) {
 async function _renderTabGrid(tab, allParam) {
   const all = allParam || await getAllWorksheets();
 
+  // Pre-compute which source-paper question keys have been used in any active worksheet.
+  // A question carries a sourceKey ("paperId::qId") when it was picked from the Question Bank.
+  const builtSourceKeys = new Set(
+    all
+      .filter(w => w.origin !== "imported" && w.status !== "archived")
+      .flatMap(w => (w.questions || []).map(q => q.sourceKey).filter(Boolean))
+  );
+
   if (tab === "worksheets") {
     const base  = all.filter(w => w.origin !== "imported" && w.status !== "archived");
     const items = _applyFilters(base, _wsFilters);
-    _renderGrid("grid-active-ws", items, "worksheet", false,
+    _renderGrid("grid-active-ws", items, "worksheet", false, builtSourceKeys,
       base.length === 0
         ? "No worksheets yet. Create your first one!"
         : "No worksheets match the current filters.");
@@ -239,24 +247,24 @@ async function _renderTabGrid(tab, allParam) {
   } else if (tab === "papers") {
     const base  = all.filter(w => w.origin === "imported" && w.status !== "archived");
     const items = _applyFilters(base, _paperFilters);
-    _renderGrid("grid-active-papers", items, "paper", false,
+    _renderGrid("grid-active-papers", items, "paper", false, builtSourceKeys,
       base.length === 0
         ? "No papers yet. Import scraped papers via the \u2191 Import button."
         : "No papers match the current filters.");
 
   } else if (tab === "archived-ws") {
     const items = all.filter(w => w.origin !== "imported" && w.status === "archived");
-    _renderGrid("grid-archived-ws", items, "worksheet", true,
+    _renderGrid("grid-archived-ws", items, "worksheet", true, builtSourceKeys,
       "No archived worksheets.");
 
   } else if (tab === "archived-papers") {
     const items = all.filter(w => w.origin === "imported" && w.status === "archived");
-    _renderGrid("grid-archived-papers", items, "paper", true,
+    _renderGrid("grid-archived-papers", items, "paper", true, builtSourceKeys,
       "No archived papers.");
   }
 }
 
-function _renderGrid(gridId, items, type, isArchived, emptyMsg) {
+function _renderGrid(gridId, items, type, isArchived, builtSourceKeys, emptyMsg) {
   const wrap = document.getElementById(gridId);
   if (!wrap) return;
 
@@ -270,7 +278,7 @@ function _renderGrid(gridId, items, type, isArchived, emptyMsg) {
   }
 
   wrap.innerHTML = `<div class="card-grid">
-    ${items.map(ws => _htmlCard(ws, type, isArchived)).join("")}
+    ${items.map(ws => _htmlCard(ws, type, isArchived, builtSourceKeys)).join("")}
   </div>`;
 }
 
@@ -278,7 +286,7 @@ function _renderGrid(gridId, items, type, isArchived, emptyMsg) {
 // Card HTML
 // ---------------------------------------------------------------------------
 
-function _htmlCard(ws, type, isArchived) {
+function _htmlCard(ws, type, isArchived, builtSourceKeys) {
   const flag       = ws.topic ? getFlag(ws.topic) : null;
   const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
   const qCount     = (ws.questions||[]).length;
@@ -297,25 +305,27 @@ function _htmlCard(ws, type, isArchived) {
     ? `<span class="badge badge-archived">Archived</span>`
     : "";
 
-  // Taken badge — worksheets: score-based; papers: question-level
-  let takenBadge = "";
-  if (activeStu && qCount > 0) {
-    if (type === "worksheet") {
-      const hasTaken = (activeStu.scores||[]).some(s => s.wsId === ws.id);
-      takenBadge = hasTaken
-        ? `<span class="badge badge-ws-taken-all">&#10003; Taken</span>`
-        : `<span class="badge badge-ws-taken-none">Not taken</span>`;
+  // Built badge — papers only, always visible (no active student needed).
+  // A question is "built" if it has been picked into any active worksheet via QB.
+  let builtBadge = "";
+  if (type === "paper" && qCount > 0 && builtSourceKeys) {
+    const builtCount = (ws.questions||[]).filter(q => builtSourceKeys.has(ws.id+"::"+q.id)).length;
+    if (builtCount === qCount) {
+      builtBadge = `<span class="badge badge-ws-taken-all">&#10003; All built</span>`;
+    } else if (builtCount > 0) {
+      builtBadge = `<span class="badge badge-ws-taken-partial">${builtCount}/${qCount} built</span>`;
     } else {
-      const takenSet   = new Set(activeStu.takenQuestions||[]);
-      const takenCount = (ws.questions||[]).filter(q => takenSet.has(ws.id+"::"+q.id)).length;
-      if (takenCount === qCount) {
-        takenBadge = `<span class="badge badge-ws-taken-all">&#10003; All taken</span>`;
-      } else if (takenCount > 0) {
-        takenBadge = `<span class="badge badge-ws-taken-partial">${takenCount}/${qCount} taken</span>`;
-      } else {
-        takenBadge = `<span class="badge badge-ws-taken-none">Not taken</span>`;
-      }
+      builtBadge = `<span class="badge badge-ws-taken-none">Not built</span>`;
     }
+  }
+
+  // Taken badge — worksheets only, score-based, requires active student
+  let takenBadge = "";
+  if (type === "worksheet" && activeStu && qCount > 0) {
+    const hasTaken = (activeStu.scores||[]).some(s => s.wsId === ws.id);
+    takenBadge = hasTaken
+      ? `<span class="badge badge-ws-taken-all">&#10003; Taken</span>`
+      : `<span class="badge badge-ws-taken-none">Not taken</span>`;
   }
 
   // Footer action button(s)
@@ -359,7 +369,7 @@ function _htmlCard(ws, type, isArchived) {
         ${archivedBadge}
         ${ws.difficulty ? `<span class="badge ${diffBadgeClass}">${_esc(ws.difficulty)}</span>` : ""}
         ${ws.type ? `<span class="badge" style="background:var(--grey-200);color:var(--grey-800)">${_esc(ws.type)}</span>` : ""}
-        ${takenBadge}
+        ${builtBadge}${takenBadge}
       </div>
       <div class="ws-card__meta">
         ${ws.strand ? `<div><strong>Strand:</strong> ${_esc(ws.strand)}</div>` : ""}
