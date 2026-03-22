@@ -83,7 +83,10 @@ function _htmlStudentDetail(stu, wsMap) {
       </div>`;
   }
 
-  const takenCount  = (stu.takenQuestions || []).length;
+  // Count questions across all worksheets the student has a recorded score on,
+  // aligning with the Active Worksheets "Taken" definition (score-based).
+  const takenCount  = [...wsMap.values()]
+    .reduce((sum, ws) => sum + (ws.questions || []).length, 0);
   const scoresCount = (stu.scores || []).length;
   const allScores   = (stu.scores || []).slice().sort((a, b) => b.date.localeCompare(a.date));
 
