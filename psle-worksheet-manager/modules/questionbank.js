@@ -12,10 +12,11 @@ let _qbFilters = {
   topic:       "",
   difficulty:  "",
   qtype:       "",  // "mcq" | "short_answer" | "long_answer"
-  takenFilter: ""   // "" = All, "taken" = Taken only, "not-taken" = Not taken only
+  builtFilter: ""   // "" = All, "built" = Built only, "not-built" = Not built only
 };
 
-let _selected = new Set(); // set of composite keys "wsId::qId"
+let _selected        = new Set(); // set of composite keys "wsId::qId"
+let _builtSourceKeys = new Set(); // sourceKeys present in any active worksheet — refreshed on each render
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -23,8 +24,6 @@ let _selected = new Set(); // set of composite keys "wsId::qId"
 
 async function renderQuestionBank(container) {
   _selected.clear();
-  // Reset takenFilter if no student is active so it doesn't silently filter
-  if (!getActiveStudent()) _qbFilters.takenFilter = "";
   const allQ = await _getAllEnrichedQuestions();
 
   container.innerHTML = `
@@ -162,15 +161,14 @@ function _htmlQBFilterBar() {
         </select>
       </div>
 
-      ${getActiveStudent() ? `
       <div class="filter-group">
-        <label>Taken</label>
-        <select id="qbf-taken">
-          <option value=""          ${_qbFilters.takenFilter===""         ?"selected":""}>All</option>
-          <option value="taken"     ${_qbFilters.takenFilter==="taken"    ?"selected":""}>Taken</option>
-          <option value="not-taken" ${_qbFilters.takenFilter==="not-taken"?"selected":""}>Not taken</option>
+        <label>Built</label>
+        <select id="qbf-built">
+          <option value=""          ${_qbFilters.builtFilter===""         ?"selected":""}>All</option>
+          <option value="built"     ${_qbFilters.builtFilter==="built"    ?"selected":""}>Built</option>
+          <option value="not-built" ${_qbFilters.builtFilter==="not-built"?"selected":""}>Not built</option>
         </select>
-      </div>` : ""}
+      </div>
 
       <button class="filter-reset" id="qbf-reset">Reset</button>
     </div>
@@ -182,17 +180,14 @@ function _htmlQBFilterBar() {
 // ---------------------------------------------------------------------------
 
 function _applyQBFilters(allQ) {
-  const stu      = getActiveStudent();
-  const takenSet = stu ? new Set(stu.takenQuestions || []) : new Set();
-
   return allQ.filter(q => {
     if (_qbFilters.level      && q._wsLevel      !== _qbFilters.level)      return false;
     if (_qbFilters.strand     && q._wsStrand     !== _qbFilters.strand)     return false;
     if (_qbFilters.topic      && q._wsTopic      !== _qbFilters.topic)      return false;
     if (_qbFilters.difficulty && q._wsDifficulty !== _qbFilters.difficulty) return false;
     if (_qbFilters.qtype      && q.type          !== _qbFilters.qtype)      return false;
-    if (_qbFilters.takenFilter === "taken"     && !takenSet.has(q._key))    return false;
-    if (_qbFilters.takenFilter === "not-taken" &&  takenSet.has(q._key))    return false;
+    if (_qbFilters.builtFilter === "built"     && !_builtSourceKeys.has(q._key)) return false;
+    if (_qbFilters.builtFilter === "not-built" &&  _builtSourceKeys.has(q._key)) return false;
     return true;
   });
 }
@@ -230,12 +225,17 @@ async function _renderQBGrid() {
   const selBar = document.getElementById("qb-selection-bar");
   if (!wrap || !selBar) return;
 
-  const allQ     = await _getAllEnrichedQuestions();
-  const filtered = _applyQBFilters(allQ);
+  const allQ = await _getAllEnrichedQuestions();
 
-  // Compute taken set once for badge rendering
-  const stu      = getActiveStudent();   // sync — cache
-  const takenSet = stu ? new Set(stu.takenQuestions || []) : new Set();
+  // Refresh built source keys: sourceKeys present in any active (built) worksheet
+  const allWs = await getAllWorksheets();
+  _builtSourceKeys = new Set(
+    allWs
+      .filter(w => w.origin !== "imported" && w.status !== "archived")
+      .flatMap(w => (w.questions || []).map(q => q.sourceKey).filter(Boolean))
+  );
+
+  const filtered = _applyQBFilters(allQ);
 
   selBar.innerHTML = _htmlSelectionBar(filtered.length);
   _bindSelectionBar(filtered);
@@ -253,7 +253,7 @@ async function _renderQBGrid() {
     return;
   }
 
-  wrap.innerHTML = `<div class="qb-grid">${filtered.map(q => _htmlQCard(q, takenSet)).join("")}</div>`;
+  wrap.innerHTML = `<div class="qb-grid">${filtered.map(q => _htmlQCard(q, _builtSourceKeys)).join("")}</div>`;
   _bindQBCardActions();
 }
 
@@ -261,7 +261,7 @@ async function _renderQBGrid() {
 // Question card HTML
 // ---------------------------------------------------------------------------
 
-function _htmlQCard(q, takenSet) {
+function _htmlQCard(q, builtSourceKeys) {
   const qtypeLabel = {
     mcq:          "MCQ",
     short_answer: "Short",
@@ -283,8 +283,8 @@ function _htmlQCard(q, takenSet) {
   const archivedBadge = q._wsStatus === "archived"
     ? `<span class="badge badge-archived" style="font-size:9px">Archived</span>`
     : "";
-  const takenBadge = takenSet && takenSet.has(q._key)
-    ? `<span class="badge badge-taken">Taken</span>`
+  const builtBadge = builtSourceKeys && builtSourceKeys.has(q._key)
+    ? `<span class="badge badge-taken">Built</span>`
     : "";
 
   const shortText = q.text.length > 130 ? q.text.slice(0, 130) + "…" : q.text;
@@ -305,7 +305,7 @@ function _htmlQCard(q, takenSet) {
         <span class="qb-card__marks">${q.marks || 1}m</span>
         <div style="flex:1"></div>
         ${q._wsLevel ? `<span class="badge badge-level" style="font-size:10px">${_esc(q._wsLevel)}</span>` : ""}
-        ${takenBadge}
+        ${builtBadge}
         ${archivedBadge}
       </div>
 
@@ -356,13 +356,13 @@ function _bindQBFilters() {
     });
   });
 
-  document.getElementById("qbf-taken")?.addEventListener("change", e => {
-    _qbFilters.takenFilter = e.target.value;
+  document.getElementById("qbf-built")?.addEventListener("change", e => {
+    _qbFilters.builtFilter = e.target.value;
     _renderQBGrid();
   });
 
   document.getElementById("qbf-reset")?.addEventListener("click", () => {
-    _qbFilters = { level:"", strand:"", topic:"", difficulty:"", qtype:"", takenFilter:"" };
+    _qbFilters = { level:"", strand:"", topic:"", difficulty:"", qtype:"", builtFilter:"" };
     _rebuildQBFilterBar();
   });
 }

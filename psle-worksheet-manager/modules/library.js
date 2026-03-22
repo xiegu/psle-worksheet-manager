@@ -336,9 +336,10 @@ function _htmlCard(ws, type, isArchived, builtSourceKeys) {
       <button class="btn btn-sm btn-primary btn-card-recover" data-id="${_esc(ws.id)}">Recover</button>
       <button class="btn btn-sm btn-danger  btn-card-delete"  data-id="${_esc(ws.id)}">Delete</button>`;
   } else if (isArchived) {
-    // Archived Worksheets: Restore
+    // Archived Worksheets: Restore + Delete
     actionBtns = `
-      <button class="btn btn-sm btn-card-unarchive" data-id="${_esc(ws.id)}">Restore</button>`;
+      <button class="btn btn-sm btn-card-unarchive" data-id="${_esc(ws.id)}">Restore</button>
+      <button class="btn btn-sm btn-danger btn-card-delete" data-id="${_esc(ws.id)}">Delete</button>`;
   } else {
     // Active cards: Archive
     actionBtns = `
