@@ -76,8 +76,7 @@ function _htmlQBStatsBar(allQ) {
       : "";
   }).filter(Boolean).join(" ");
 
-  const wsCount    = new Set(allQ.map(q => q._wsId)).size;
-  const totalMarks = allQ.reduce((s, q) => s + (parseInt(q.marks) || 0), 0);
+  const wsCount = new Set(allQ.map(q => q._wsId)).size;
 
   return `
     <div class="stats-bar">
@@ -86,12 +85,8 @@ function _htmlQBStatsBar(allQ) {
         <div class="stat-card__label">Total Questions</div>
       </div>
       <div class="stat-card">
-        <div class="stat-card__value">${totalMarks}</div>
-        <div class="stat-card__label">Total Marks</div>
-      </div>
-      <div class="stat-card">
         <div class="stat-card__value">${wsCount}</div>
-        <div class="stat-card__label">From Worksheets</div>
+        <div class="stat-card__label">From Papers</div>
       </div>
       <div class="stat-card" style="flex:2">
         <div class="stat-card__label" style="margin-bottom:6px">By Level</div>
