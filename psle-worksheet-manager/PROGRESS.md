@@ -103,21 +103,21 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 - [ ] **Prevent duplicate score recording** ([#14](https://github.com/xiegu/psle-worksheet-manager/issues/14)) — warn on duplicate, validate score range
 - [ ] **Fix drag-drop index validation** ([#21](https://github.com/xiegu/psle-worksheet-manager/issues/21)) — bounds check + archive error handling
 
-### Enhancements (GitHub Issues #4, #5, #13, #15–#20, #22–#24)
+### Enhancements (GitHub Issues #4, #5, #13, #15–#17)
 - [ ] **Batch print** ([#4](https://github.com/xiegu/psle-worksheet-manager/issues/4)) — print multiple worksheets in one browser print session
 - [ ] **Separate answer key sheet** ([#5](https://github.com/xiegu/psle-worksheet-manager/issues/5)) — printable answer key on its own page
 - [ ] **Deduplicate `_esc()` helper** ([#13](https://github.com/xiegu/psle-worksheet-manager/issues/13)) — shared utility instead of 5 copies
 - [ ] **Print output improvements** ([#15](https://github.com/xiegu/psle-worksheet-manager/issues/15)) — logo fallback, text overflow, page break orphans, diagram size limit
 - [ ] **Accessibility** ([#16](https://github.com/xiegu/psle-worksheet-manager/issues/16)) — keyboard nav, ARIA labels, Enter-to-submit
 - [ ] **Text search + pagination** ([#17](https://github.com/xiegu/psle-worksheet-manager/issues/17)) — search in Library, paginate Question Bank
-- [ ] **Undo/redo + touch reorder** ([#18](https://github.com/xiegu/psle-worksheet-manager/issues/18)) — builder undo stack, touch drag support
-- [ ] **Bulk operations** ([#19](https://github.com/xiegu/psle-worksheet-manager/issues/19)) — multi-select archive, delete, assign topic
-- [ ] **Taken question timestamps** ([#20](https://github.com/xiegu/psle-worksheet-manager/issues/20)) — track when questions were taken
-- [ ] **Focus management** ([#22](https://github.com/xiegu/psle-worksheet-manager/issues/22)) — preserve focus on filter rebuild
-- [ ] **QB performance** ([#23](https://github.com/xiegu/psle-worksheet-manager/issues/23)) — cache enriched questions, reduce re-fetches
-- [ ] **Multi-subject titles** ([#24](https://github.com/xiegu/psle-worksheet-manager/issues/24)) — subject field in worksheet schema
 
 ### Completed
+- [x] **Multi-subject titles** ([#24](https://github.com/xiegu/psle-worksheet-manager/issues/24)) — preview + print headers use `ws.subject||"Maths"` + " Worksheet" instead of hardcoded "Math Worksheet"
+- [x] **QB performance** ([#23](https://github.com/xiegu/psle-worksheet-manager/issues/23)) — `_enrichedQCache` + `_builtSourceKeysCache` at module level; reset on `renderQuestionBank()`
+- [x] **Focus management** ([#22](https://github.com/xiegu/psle-worksheet-manager/issues/22)) — `_rebuildFilterBar` and `_rebuildQBFilterBar` preserve `document.activeElement.id` across rebuilds
+- [x] **Bulk operations** ([#19](https://github.com/xiegu/psle-worksheet-manager/issues/19)) — checkboxes on all cards; bulk bar with Archive/Delete/Restore; Assign Topic modal for worksheets
+- [x] **Undo + move-up/down in builder** ([#18](https://github.com/xiegu/psle-worksheet-manager/issues/18)) — `_undoSnapshot` saved before delete/drag-drop/move; Undo button in action bar; ↑↓ buttons on each question card
+- [x] ~~**Taken question timestamps** ([#20](https://github.com/xiegu/psle-worksheet-manager/issues/20))~~ — won't fix (per-question timestamps not needed)
 - [x] **Fix race condition in student cache + null checks** ([#10](https://github.com/xiegu/psle-worksheet-manager/issues/10))
 - [x] **Fix question ID collisions** ([#11](https://github.com/xiegu/psle-worksheet-manager/issues/11))
 - [x] **XSS risk in imported data** ([#12](https://github.com/xiegu/psle-worksheet-manager/issues/12))
@@ -147,4 +147,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-22 — fixed critical issues #10–#12 (race condition, ID collisions, XSS); "built" badge system (sourceKey-based); delete on archived worksheets; QB built filter + stats bar; students Questions Taken aligned with score-based logic*
+*Last updated: 2026-03-23 — resolved #18 (undo + move-up/down), #19 (bulk operations), #20 (won't fix), #22 (focus preservation), #23 (QB caching), #24 (subject-aware titles)*

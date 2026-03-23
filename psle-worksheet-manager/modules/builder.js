@@ -10,6 +10,7 @@ let _draft     = {};       // metadata fields
 let _questions = [];       // array of question objects
 let _teacherPreview = false;
 let _dragSrcIdx = null;    // drag-and-drop source index
+let _undoSnapshot = null;  // last undo snapshot of _questions
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -36,6 +37,7 @@ async function renderBuilder(container, editingId) {
   AppState.bankQuestions = null;
   AppState.bankMeta      = null;
   _teacherPreview = false;
+  _undoSnapshot   = null;
 
   container.innerHTML = `
     <div class="builder-layout">
@@ -168,6 +170,8 @@ function _htmlQuestionCard(q, i) {
     <div class="question-card" data-idx="${i}" draggable="true">
       <div class="question-card__header">
         <span class="drag-handle" title="Drag to reorder">&#8597;</span>
+        <button class="btn btn-sm btn-move-up"   data-idx="${i}" title="Move up"   ${i===0?"disabled":""} style="padding:1px 5px;font-size:11px">&#8593;</button>
+        <button class="btn btn-sm btn-move-down" data-idx="${i}" title="Move down" ${i===_questions.length-1?"disabled":""} style="padding:1px 5px;font-size:11px">&#8595;</button>
         <span class="question-card__num">Q${i + 1}</span>
         <div class="question-card__type">
           <select class="q-type-select" data-idx="${i}">
@@ -248,6 +252,7 @@ function _htmlActionBar() {
   const isEditing = !!_draft.id;
   return `
     <button class="btn" id="btn-cancel">&#8592; Back to Library</button>
+    <button class="btn" id="btn-undo" style="display:${_undoSnapshot?"":"none"}">&#8617; Undo</button>
     <button class="btn btn-primary" id="btn-save">
       ${isEditing ? "Save Changes" : "Save to Library"}
     </button>
@@ -323,7 +328,7 @@ function _htmlPreviewContent() {
     ${_teacherPreview
       ? `<div style="color:var(--red);font-weight:700;font-size:9px;letter-spacing:.08em;text-align:right;margin-bottom:4px">ANSWER KEY</div>`
       : ""}
-    <div class="preview-ws-title">Math Worksheet</div>
+    <div class="preview-ws-title">${_esc((_draft.subject||"Maths")+" Worksheet")}</div>
     <div class="preview-ws-meta">
       ${_draft.level ? `<strong>${_draft.level}</strong> &nbsp;` : ""}
       ${_draft.topic ? _esc(_draft.topic) : "<em>No topic selected</em>"}
@@ -362,6 +367,16 @@ function _esc(str) {
 /** Generate a collision-resistant question ID */
 function _newQId() {
   return "q_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
+}
+
+/** Save questions snapshot for undo */
+function _saveUndo() {
+  _undoSnapshot = _questions.map(q => ({
+    ...q,
+    options: q.options ? [...q.options] : undefined
+  }));
+  const btn = document.getElementById("btn-undo");
+  if (btn) btn.style.display = "";
 }
 
 // ---------------------------------------------------------------------------
@@ -489,13 +504,34 @@ function _bindQuestions() {
     _showQBPickerModal();
   });
 
-  // Delegate: delete, field edits, type change
+  // Delegate: delete, move, field edits, type change
   list.addEventListener("click", e => {
     const delBtn = e.target.closest(".btn-delete-q");
     if (delBtn) {
       const idx = parseInt(delBtn.dataset.idx);
+      _saveUndo();
       _questions.splice(idx, 1);
       _rerenderQuestions();
+      return;
+    }
+    const moveUp = e.target.closest(".btn-move-up");
+    if (moveUp) {
+      const idx = parseInt(moveUp.dataset.idx);
+      if (idx > 0) {
+        _saveUndo();
+        [_questions[idx-1], _questions[idx]] = [_questions[idx], _questions[idx-1]];
+        _rerenderQuestions();
+      }
+      return;
+    }
+    const moveDown = e.target.closest(".btn-move-down");
+    if (moveDown) {
+      const idx = parseInt(moveDown.dataset.idx);
+      if (idx < _questions.length - 1) {
+        _saveUndo();
+        [_questions[idx], _questions[idx+1]] = [_questions[idx+1], _questions[idx]];
+        _rerenderQuestions();
+      }
       return;
     }
     const rmDiagram = e.target.closest(".q-btn-remove-diagram");
@@ -578,6 +614,7 @@ function _bindQuestions() {
     const destIdx = parseInt(card.dataset.idx);
     if (destIdx === _dragSrcIdx) return;
 
+    _saveUndo();
     const [moved] = _questions.splice(_dragSrcIdx, 1);
     _questions.splice(destIdx, 0, moved);
     _rerenderQuestions();
@@ -587,6 +624,16 @@ function _bindQuestions() {
 function _bindActionBar() {
   document.getElementById("btn-cancel")?.addEventListener("click", () => {
     navigate("library");
+  });
+
+  document.getElementById("btn-undo")?.addEventListener("click", () => {
+    if (!_undoSnapshot) return;
+    _questions = _undoSnapshot;
+    _undoSnapshot = null;
+    _rerenderQuestions();
+    const btn = document.getElementById("btn-undo");
+    if (btn) btn.style.display = "none";
+    showToast("Undone.", "success");
   });
 
   document.getElementById("btn-save")?.addEventListener("click", async () => {

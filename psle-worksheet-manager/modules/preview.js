@@ -76,7 +76,7 @@ function _renderPage(ws, teacherMode) {
     <div class="pv-ws-header">
       <div class="pv-logo"><img src="logo.png" alt="Logo" /></div>
       <div class="pv-title-block">
-        <h1 class="pv-ws-title">Math Worksheet</h1>
+        <h1 class="pv-ws-title">${_pvEsc((ws.subject||"Maths")+" Worksheet")}</h1>
         <div class="pv-ws-meta">
           ${ws.level      ? `<span>Level: <span class="ws-badge ws-badge--level">${_pvEsc(ws.level)}</span></span>` : ""}
           <span>Topic: ${_pvEsc(ws.topic||"—")} ${flagBadge}</span>
@@ -344,7 +344,7 @@ function generateWorksheetHTML(ws, teacherMode) {
   <div class="ws-header">
     <div class="ws-logo">${window.LOGO_DATA_URL ? `<img src="${window.LOGO_DATA_URL}" alt="Logo" />` : ""}</div>
     <div class="ws-title-block">
-      <h1>Math Worksheet</h1>
+      <h1>${_pvEsc((ws.subject||"Maths")+" Worksheet")}</h1>
       <div class="ws-meta">
         ${ws.level ? `<span>Level: <span class="badge badge-level">${_pvEsc(ws.level)}</span></span>` : ""}
         <span>Topic: ${_pvEsc(ws.topic||"—")} ${flagBadge}</span>

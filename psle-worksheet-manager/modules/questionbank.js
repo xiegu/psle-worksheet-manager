@@ -18,12 +18,18 @@ let _qbFilters = {
 let _selected        = new Set(); // set of composite keys "wsId::qId"
 let _builtSourceKeys = new Set(); // sourceKeys present in any active worksheet — refreshed on each render
 
+// Cache to avoid redundant DB fetches on filter changes (#23)
+let _enrichedQCache       = null;
+let _builtSourceKeysCache = null;
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
 async function renderQuestionBank(container) {
   _selected.clear();
+  _enrichedQCache       = null;  // reset caches on full render
+  _builtSourceKeysCache = null;
   const allQ = await _getAllEnrichedQuestions();
 
   container.innerHTML = `
@@ -42,6 +48,7 @@ async function renderQuestionBank(container) {
 // ---------------------------------------------------------------------------
 
 async function _getAllEnrichedQuestions() {
+  if (_enrichedQCache) return _enrichedQCache;
   const result = [];
   // Only questions from active source papers appear in the Question Bank
   for (const ws of (await getAllWorksheets()).filter(w => w.origin === "imported" && w.status !== "archived")) {
@@ -61,6 +68,7 @@ async function _getAllEnrichedQuestions() {
       });
     }
   }
+  _enrichedQCache = result;
   return result;
 }
 
@@ -222,13 +230,16 @@ async function _renderQBGrid() {
 
   const allQ = await _getAllEnrichedQuestions();
 
-  // Refresh built source keys: sourceKeys present in any active (built) worksheet
-  const allWs = await getAllWorksheets();
-  _builtSourceKeys = new Set(
-    allWs
-      .filter(w => w.origin !== "imported" && w.status !== "archived")
-      .flatMap(w => (w.questions || []).map(q => q.sourceKey).filter(Boolean))
-  );
+  // Refresh built source keys using cache to avoid redundant DB reads
+  if (!_builtSourceKeysCache) {
+    const allWs = await getAllWorksheets();
+    _builtSourceKeysCache = new Set(
+      allWs
+        .filter(w => w.origin !== "imported" && w.status !== "archived")
+        .flatMap(w => (w.questions || []).map(q => q.sourceKey).filter(Boolean))
+    );
+  }
+  _builtSourceKeys = _builtSourceKeysCache;
 
   const filtered = _applyQBFilters(allQ);
 
@@ -363,10 +374,12 @@ function _bindQBFilters() {
 }
 
 function _rebuildQBFilterBar() {
+  const focusedId = document.activeElement?.id;
   const bar = document.getElementById("qb-filter-bar");
   if (!bar) return;
   bar.outerHTML = _htmlQBFilterBar();
   _bindQBFilters();
+  if (focusedId) document.getElementById(focusedId)?.focus();
   _renderQBGrid();
 }
 

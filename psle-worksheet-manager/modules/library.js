@@ -17,11 +17,15 @@ let _activeTab    = "worksheets";
 // Dynamic filter options for Available Papers — populated from actual data
 let _paperFilterOptions = { schools:[], years:[], subjects:[], paperTypes:[] };
 
+// Bulk selection state
+let _selectedCards = new Set();
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 
 async function renderLibrary(container) {
+  _selectedCards.clear();
   const all = await getAllWorksheets();
 
   // Counts for tab labels and stats bar
@@ -119,14 +123,16 @@ function _htmlTabContent(tab) {
       <button class="btn btn-primary" id="btn-new-from-library">+ New Worksheet</button>
     </div>
     <div id="filter-wrap-ws">${_htmlFilterBar("ws", _wsFilters)}</div>
+    <div id="lib-bulk-bar"></div>
     <div id="grid-active-ws"></div>
   `;
   if (tab === "papers") return `
     <div id="filter-wrap-paper">${_htmlFilterBar("paper", _paperFilters)}</div>
+    <div id="lib-bulk-bar"></div>
     <div id="grid-active-papers"></div>
   `;
-  if (tab === "archived-ws")     return `<div id="grid-archived-ws"></div>`;
-  if (tab === "archived-papers") return `<div id="grid-archived-papers"></div>`;
+  if (tab === "archived-ws")     return `<div id="lib-bulk-bar"></div><div id="grid-archived-ws"></div>`;
+  if (tab === "archived-papers") return `<div id="lib-bulk-bar"></div><div id="grid-archived-papers"></div>`;
   return "";
 }
 
@@ -360,6 +366,8 @@ async function _renderTabGrid(tab, allParam) {
     _renderGrid("grid-archived-papers", items, "paper", true, builtSourceKeys,
       "No archived papers.");
   }
+
+  _updateBulkBarForCurrentTab();
 }
 
 function _renderGrid(gridId, items, type, isArchived, builtSourceKeys, emptyMsg) {
@@ -378,6 +386,159 @@ function _renderGrid(gridId, items, type, isArchived, builtSourceKeys, emptyMsg)
   wrap.innerHTML = `<div class="card-grid">
     ${items.map(ws => _htmlCard(ws, type, isArchived, builtSourceKeys)).join("")}
   </div>`;
+}
+
+// ---------------------------------------------------------------------------
+// Bulk selection bar
+// ---------------------------------------------------------------------------
+
+function _htmlBulkBar(type, isArchived) {
+  const n = _selectedCards.size;
+  if (n === 0) return "";
+  let actions = "";
+  if (isArchived) {
+    actions = `
+      <button class="btn btn-sm btn-primary" id="btn-bulk-restore">Restore (${n})</button>
+      <button class="btn btn-sm btn-danger"  id="btn-bulk-delete-sel">Delete (${n})</button>`;
+  } else {
+    actions = `
+      <button class="btn btn-sm btn-danger" id="btn-bulk-archive">Archive (${n})</button>
+      <button class="btn btn-sm btn-danger" id="btn-bulk-delete-sel">Delete (${n})</button>
+      ${type === "worksheet" ? `<button class="btn btn-sm" id="btn-bulk-assign-topic">Assign Topic</button>` : ""}`;
+  }
+  return `
+    <div class="lib-bulk-bar">
+      <span style="font-size:13px;font-weight:600">${n} selected</span>
+      <button class="btn btn-sm" id="btn-bulk-clear">Clear</button>
+      ${actions}
+    </div>`;
+}
+
+function _updateBulkBarForCurrentTab() {
+  const isArchived = _activeTab === "archived-ws" || _activeTab === "archived-papers";
+  const type = (_activeTab === "worksheets" || _activeTab === "archived-ws") ? "worksheet" : "paper";
+  const bar = document.getElementById("lib-bulk-bar");
+  if (!bar) return;
+  bar.innerHTML = _htmlBulkBar(type, isArchived);
+  _bindBulkBar(type, isArchived);
+}
+
+function _bindBulkBar(type, isArchived) {
+  document.getElementById("btn-bulk-clear")?.addEventListener("click", () => {
+    _selectedCards.clear();
+    _updateBulkBarForCurrentTab();
+    document.querySelectorAll(".lib-card-check").forEach(cb => { cb.checked = false; });
+    document.querySelectorAll(".ws-card--selected").forEach(c => c.classList.remove("ws-card--selected"));
+  });
+
+  document.getElementById("btn-bulk-archive")?.addEventListener("click", async () => {
+    if (!confirm(`Archive ${_selectedCards.size} item(s)?`)) return;
+    for (const id of _selectedCards) { try { await archiveWorksheet(id); } catch(e) {} }
+    _selectedCards.clear();
+    showToast("Archived.", "success");
+    await _rerenderLibrary();
+  });
+
+  document.getElementById("btn-bulk-delete-sel")?.addEventListener("click", async () => {
+    if (!confirm(`Permanently delete ${_selectedCards.size} item(s)?`)) return;
+    for (const id of _selectedCards) { try { await deleteWorksheet(id); } catch(e) {} }
+    _selectedCards.clear();
+    showToast("Deleted.", "success");
+    await _rerenderLibrary();
+  });
+
+  document.getElementById("btn-bulk-restore")?.addEventListener("click", async () => {
+    for (const id of _selectedCards) { try { await unarchiveWorksheet(id); } catch(e) {} }
+    _selectedCards.clear();
+    showToast("Restored.", "success");
+    await _rerenderLibrary();
+  });
+
+  document.getElementById("btn-bulk-assign-topic")?.addEventListener("click", _showAssignTopicModal);
+}
+
+function _showAssignTopicModal() {
+  document.getElementById("assign-topic-modal")?.remove();
+  const modal = document.createElement("div");
+  modal.id        = "assign-topic-modal";
+  modal.className = "qb-modal-overlay";
+  modal.innerHTML = `
+    <div class="qb-modal" role="dialog" aria-modal="true" style="max-width:420px;width:92vw">
+      <div class="qb-modal__header">
+        <div style="font-weight:700;font-size:15px">Assign Topic to ${_selectedCards.size} worksheet(s)</div>
+        <button class="qb-modal__close" id="at-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="qb-modal__body" style="padding:16px;display:flex;flex-direction:column;gap:10px">
+        <div class="form-group">
+          <label>Level</label>
+          <select id="at-level">
+            <option value="">— Select —</option>
+            ${["P1","P2","P3","P4","P5","P6"].map(l => `<option value="${l}">${l}</option>`).join("")}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Strand</label>
+          <select id="at-strand" disabled>
+            <option value="">— Select level first —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Topic</label>
+          <select id="at-topic" disabled>
+            <option value="">— Select strand first —</option>
+          </select>
+        </div>
+      </div>
+      <div class="qb-modal__footer">
+        <button class="btn btn-primary" id="at-apply" disabled>Apply</button>
+        <button class="btn" id="at-cancel">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const close = () => modal.remove();
+  document.getElementById("at-close")?.addEventListener("click", close);
+  document.getElementById("at-cancel")?.addEventListener("click", close);
+  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+
+  document.getElementById("at-level")?.addEventListener("change", e => {
+    const strands  = e.target.value ? getStrands(e.target.value) : [];
+    const strandEl = document.getElementById("at-strand");
+    strandEl.innerHTML = `<option value="">— Select —</option>` + strands.map(s => `<option value="${_esc(s)}">${_esc(s)}</option>`).join("");
+    strandEl.disabled  = !strands.length;
+    document.getElementById("at-topic").innerHTML  = `<option value="">— Select strand first —</option>`;
+    document.getElementById("at-topic").disabled   = true;
+    document.getElementById("at-apply").disabled   = true;
+  });
+
+  document.getElementById("at-strand")?.addEventListener("change", e => {
+    const level  = document.getElementById("at-level").value;
+    const topics = (level && e.target.value) ? getTopics(level, e.target.value) : [];
+    const topicEl = document.getElementById("at-topic");
+    topicEl.innerHTML = `<option value="">— Select —</option>` + topics.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join("");
+    topicEl.disabled  = !topics.length;
+    document.getElementById("at-apply").disabled = true;
+  });
+
+  document.getElementById("at-topic")?.addEventListener("change", e => {
+    document.getElementById("at-apply").disabled = !e.target.value;
+  });
+
+  document.getElementById("at-apply")?.addEventListener("click", async () => {
+    const level  = document.getElementById("at-level").value;
+    const strand = document.getElementById("at-strand").value;
+    const topic  = document.getElementById("at-topic").value;
+    if (!topic) return;
+    for (const id of _selectedCards) {
+      const ws = await getWorksheet(id);
+      if (!ws) continue;
+      await saveWorksheet({ ...ws, level, strand, topic, updatedAt: new Date().toISOString().slice(0,10) });
+    }
+    _selectedCards.clear();
+    close();
+    showToast("Topic assigned.", "success");
+    await _rerenderLibrary();
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -458,8 +619,9 @@ function _htmlCard(ws, type, isArchived, builtSourceKeys) {
   })() : "";
 
   return `
-    <div class="ws-card ${isArchived?"ws-card--archived":""}" data-id="${_esc(ws.id)}">
+    <div class="ws-card ${isArchived?"ws-card--archived":""} ${_selectedCards.has(ws.id)?"ws-card--selected":""}" data-id="${_esc(ws.id)}">
       <div class="ws-card__header">
+        <input type="checkbox" class="lib-card-check" data-id="${_esc(ws.id)}" ${_selectedCards.has(ws.id)?"checked":""} title="Select for bulk action" />
         <div class="ws-card__title">${_esc(ws.title||"Untitled")}</div>
         ${ws.level ? `<span class="badge badge-level">${_esc(ws.level)}</span>` : ""}
       </div>
@@ -495,11 +657,23 @@ function _htmlCard(ws, type, isArchived, builtSourceKeys) {
 // ---------------------------------------------------------------------------
 
 function _bindLibrary() {
+  const wrap = document.getElementById("lib-wrap");
   // Single delegated listener on lib-wrap handles tabs AND card actions
-  document.getElementById("lib-wrap")?.addEventListener("click", async e => {
+  wrap?.addEventListener("click", async e => {
     const tabBtn = e.target.closest(".lib-tab[data-tab]");
     if (tabBtn) { await _switchTab(tabBtn.dataset.tab); return; }
     _onCardClick(e);
+  });
+  // Checkbox toggling for bulk select
+  wrap?.addEventListener("change", e => {
+    const cb = e.target.closest(".lib-card-check");
+    if (!cb) return;
+    const id = cb.dataset.id;
+    if (cb.checked) _selectedCards.add(id);
+    else            _selectedCards.delete(id);
+    const card = wrap.querySelector(`.ws-card[data-id="${id}"]`);
+    if (card) card.classList.toggle("ws-card--selected", cb.checked);
+    _updateBulkBarForCurrentTab();
   });
 
   _bindTabContent(_activeTab);
@@ -541,16 +715,19 @@ function _bindFilterBar(prefix) {
 }
 
 function _rebuildFilterBar(prefix) {
+  const focusedId = document.activeElement?.id;
   const wrap = document.getElementById(`filter-wrap-${prefix}`);
   if (!wrap) return;
   const filters = prefix === "ws" ? _wsFilters : _paperFilters;
   wrap.innerHTML = _htmlFilterBar(prefix, filters);
   _bindFilterBar(prefix);
+  if (focusedId) document.getElementById(focusedId)?.focus();
   _renderTabGrid(_activeTab);
 }
 
 async function _switchTab(tab) {
   _activeTab = tab;
+  _selectedCards.clear();
 
   // Update tab button styles
   document.querySelectorAll(".lib-tab").forEach(btn => {
