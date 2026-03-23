@@ -1168,6 +1168,17 @@ button { cursor: pointer; font-family: inherit; }
   font-weight: 400;
 }
 
+/* Previous-score notice in Record Score modal */
+.score-prev-notice {
+  font-size: 12px;
+  color: var(--amber);
+  background: var(--amber-light);
+  border: 1px solid #e6c200;
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  margin-bottom: 10px;
+}
+
 /* Score entry modal body */
 .score-form {
   display: flex;

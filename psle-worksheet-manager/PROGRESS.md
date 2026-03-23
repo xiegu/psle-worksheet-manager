@@ -103,7 +103,7 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 - [ ] **Prevent duplicate score recording** ([#14](https://github.com/xiegu/psle-worksheet-manager/issues/14)) — warn on duplicate, validate score range
 - [ ] **Fix drag-drop index validation** ([#21](https://github.com/xiegu/psle-worksheet-manager/issues/21)) — bounds check + archive error handling
 
-### Enhancements (GitHub Issues #4, #5, #13, #15–#17)
+### Enhancements (GitHub Issues #4, #5, #15–#17)
 - [ ] **Batch print** ([#4](https://github.com/xiegu/psle-worksheet-manager/issues/4)) — print multiple worksheets in one browser print session
 - [ ] **Separate answer key sheet** ([#5](https://github.com/xiegu/psle-worksheet-manager/issues/5)) — printable answer key on its own page
 - [ ] **Deduplicate `_esc()` helper** ([#13](https://github.com/xiegu/psle-worksheet-manager/issues/13)) — shared utility instead of 5 copies
@@ -112,6 +112,8 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 - [ ] **Text search + pagination** ([#17](https://github.com/xiegu/psle-worksheet-manager/issues/17)) — search in Library, paginate Question Bank
 
 ### Completed
+- [x] **Prevent duplicate score recording** ([#14](https://github.com/xiegu/psle-worksheet-manager/issues/14)) — modal shows prior scores; same-date duplicate triggers confirm-to-replace; range validated (0 ≤ obtained ≤ total)
+- [x] **Deduplicate `_esc()` helper** ([#13](https://github.com/xiegu/psle-worksheet-manager/issues/13)) — single `_esc()` in `modules/utils.js` (loaded first); removed 5 local copies from library, builder, questionbank, preview, students
 - [x] **Multi-subject titles** ([#24](https://github.com/xiegu/psle-worksheet-manager/issues/24)) — preview + print headers use `ws.subject||"Maths"` + " Worksheet" instead of hardcoded "Math Worksheet"
 - [x] **QB performance** ([#23](https://github.com/xiegu/psle-worksheet-manager/issues/23)) — `_enrichedQCache` + `_builtSourceKeysCache` at module level; reset on `renderQuestionBank()`
 - [x] **Focus management** ([#22](https://github.com/xiegu/psle-worksheet-manager/issues/22)) — `_rebuildFilterBar` and `_rebuildQBFilterBar` preserve `document.activeElement.id` across rebuilds
@@ -147,4 +149,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-23 — resolved #18 (undo + move-up/down), #19 (bulk operations), #20 (won't fix), #22 (focus preservation), #23 (QB caching), #24 (subject-aware titles)*
+*Last updated: 2026-03-23 — resolved #13 (shared _esc utility), #14 (duplicate score guard), #18 (undo + move-up/down), #19 (bulk operations), #20 (won't fix), #22 (focus preservation), #23 (QB caching), #24 (subject-aware titles)*

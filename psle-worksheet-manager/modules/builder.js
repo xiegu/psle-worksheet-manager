@@ -356,13 +356,6 @@ function _marksLabel() {
   return `Running total: ${_questions.length} question${_questions.length!==1?"s":""} &mdash; ${total} mark${total!==1?"s":""}`;
 }
 
-function _esc(str) {
-  return String(str ?? "")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;");
-}
 
 /** Generate a collision-resistant question ID */
 function _newQId() {

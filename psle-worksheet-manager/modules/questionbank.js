@@ -806,14 +806,3 @@ function _setupCropCanvas(originalDiagramUrl) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Shared escape helper
-// ---------------------------------------------------------------------------
-
-function _esc(str) {
-  return String(str ?? "")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;");
-}

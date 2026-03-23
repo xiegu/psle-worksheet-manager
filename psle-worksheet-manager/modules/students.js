@@ -52,7 +52,7 @@ function _htmlStudentLeftPanel(students, activeId) {
       <select id="stu-select">
         <option value="">— none —</option>
         ${students.map(s =>
-          `<option value="${_escStu(s.id)}" ${activeId === s.id ? "selected" : ""}>${_escStu(s.name)}</option>`
+          `<option value="${_esc(s.id)}" ${activeId === s.id ? "selected" : ""}>${_esc(s.name)}</option>`
         ).join("")}
       </select>
     </div>
@@ -98,19 +98,19 @@ function _htmlStudentDetail(stu, wsMap) {
           ${allScores.map(sc => {
             const ws      = wsMap.get(sc.wsId);
             const wsTitle = ws
-              ? _escStu(ws.title || "Untitled")
-              : `<em style="color:var(--grey-400)">${_escStu(sc.wsId)}</em>`;
+              ? _esc(ws.title || "Untitled")
+              : `<em style="color:var(--grey-400)">${_esc(sc.wsId)}</em>`;
             return `<tr>
               <td>${wsTitle}</td>
               <td>${sc.score} / ${sc.total}</td>
-              <td>${_escStu(sc.date)}</td>
+              <td>${_esc(sc.date)}</td>
             </tr>`;
           }).join("")}
         </tbody>
        </table>`;
 
   return `
-    <div class="builder-section__title">${_escStu(stu.name)}</div>
+    <div class="builder-section__title">${_esc(stu.name)}</div>
     <div class="stats-bar" style="margin-bottom:16px">
       <div class="stat-card">
         <div class="stat-card__value">${takenCount}</div>
@@ -234,20 +234,9 @@ function renderActiveStudentIndicator() {
   if (!container) return;
   const stu = getActiveStudent();   // sync — cache
   if (stu) {
-    container.innerHTML = `<div class="active-student-pill">&#128100; ${_escStu(stu.name)}</div>`;
+    container.innerHTML = `<div class="active-student-pill">&#128100; ${_esc(stu.name)}</div>`;
   } else {
     container.innerHTML = `<div class="active-student-pill active-student-pill--none">&#128100; No student</div>`;
   }
 }
 
-// ---------------------------------------------------------------------------
-// Escape helper
-// ---------------------------------------------------------------------------
-
-function _escStu(str) {
-  return String(str ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}

@@ -62,7 +62,7 @@ async function renderPreview(container, worksheetId) {
 function _renderPage(ws, teacherMode) {
   const flag       = ws.topic ? getFlag(ws.topic) : null;
   const flagBadge  = flag
-    ? `<span class="ws-badge ws-badge--${flag.flag.replace("_","-")}">${_pvEsc(flag.label)}</span>`
+    ? `<span class="ws-badge ws-badge--${flag.flag.replace("_","-")}">${_esc(flag.label)}</span>`
     : "";
   const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
 
@@ -76,12 +76,12 @@ function _renderPage(ws, teacherMode) {
     <div class="pv-ws-header">
       <div class="pv-logo"><img src="logo.png" alt="Logo" /></div>
       <div class="pv-title-block">
-        <h1 class="pv-ws-title">${_pvEsc((ws.subject||"Maths")+" Worksheet")}</h1>
+        <h1 class="pv-ws-title">${_esc((ws.subject||"Maths")+" Worksheet")}</h1>
         <div class="pv-ws-meta">
-          ${ws.level      ? `<span>Level: <span class="ws-badge ws-badge--level">${_pvEsc(ws.level)}</span></span>` : ""}
-          <span>Topic: ${_pvEsc(ws.topic||"—")} ${flagBadge}</span>
-          ${ws.difficulty ? `<span>Difficulty: ${_pvEsc(ws.difficulty)}</span>` : ""}
-          ${ws.type       ? `<span>Type: ${_pvEsc(ws.type)}</span>` : ""}
+          ${ws.level      ? `<span>Level: <span class="ws-badge ws-badge--level">${_esc(ws.level)}</span></span>` : ""}
+          <span>Topic: ${_esc(ws.topic||"—")} ${flagBadge}</span>
+          ${ws.difficulty ? `<span>Difficulty: ${_esc(ws.difficulty)}</span>` : ""}
+          ${ws.type       ? `<span>Type: ${_esc(ws.type)}</span>` : ""}
         </div>
       </div>
     </div>
@@ -100,7 +100,7 @@ function _renderPage(ws, teacherMode) {
     ${questionsHtml}
 
     <div class="pv-footer">
-      <span class="pv-footer__label">${_pvEsc(ws.title)}</span>
+      <span class="pv-footer__label">${_esc(ws.title)}</span>
       <div class="pv-marks-box">Total: &nbsp;&nbsp;&nbsp; / ${totalMarks} marks</div>
     </div>
 
@@ -117,7 +117,7 @@ function _renderQuestion(q, i, teacherMode) {
       ${opts.map((o, oi) => `
         <div class="pv-mcq-option">
           <div class="pv-mcq-circle"></div>
-          (${String.fromCharCode(65 + oi)}) &nbsp; ${_pvEsc(o)}
+          (${String.fromCharCode(65 + oi)}) &nbsp; ${_esc(o)}
         </div>`).join("")}
     </div>`;
   } else {
@@ -133,9 +133,9 @@ function _renderQuestion(q, i, teacherMode) {
   }
 
   const answerRow  = teacherMode && q.answer
-    ? `<div class="pv-answer-reveal">Ans: ${_pvEsc(q.answer)}</div>` : "";
+    ? `<div class="pv-answer-reveal">Ans: ${_esc(q.answer)}</div>` : "";
   const workingRow = teacherMode && q.working
-    ? `<div class="pv-working-reveal">${_pvEsc(q.working)}</div>` : "";
+    ? `<div class="pv-working-reveal">${_esc(q.working)}</div>` : "";
 
   const diagramHtml = q.diagramImage
     ? `<img class="pv-diagram-img" src="${q.diagramImage}" alt="Diagram for Q${i + 1}" />`
@@ -145,7 +145,7 @@ function _renderQuestion(q, i, teacherMode) {
     <div class="pv-question">
       <div class="pv-q-stem">
         <span class="pv-q-num">Q${i + 1}.</span>
-        <span class="pv-q-text">${_pvEsc(q.text || "(no question text)")}</span>
+        <span class="pv-q-text">${_esc(q.text || "(no question text)")}</span>
         <span class="pv-q-marks">[${q.marks || 1}m]</span>
       </div>
       ${diagramHtml}
@@ -159,8 +159,8 @@ function _renderAnswerKey(ws) {
   const rows = (ws.questions||[]).map((q, i) => `
     <tr>
       <td>Q${i + 1}</td>
-      <td>${_pvEsc(q.answer || "—")}</td>
-      <td class="pv-ak-working">${_pvEsc(q.working || "")}</td>
+      <td>${_esc(q.answer || "—")}</td>
+      <td class="pv-ak-working">${_esc(q.working || "")}</td>
       <td>${q.marks || 1}</td>
     </tr>`).join("");
 
@@ -219,7 +219,7 @@ function _bindPreview() {
 function generateWorksheetHTML(ws, teacherMode) {
   const flag       = ws.topic ? getFlag(ws.topic) : null;
   const flagBadge  = flag
-    ? `<span class="badge badge-${flag.flag.replace("_","-")}">${_pvEsc(flag.label)}</span>`
+    ? `<span class="badge badge-${flag.flag.replace("_","-")}">${_esc(flag.label)}</span>`
     : "";
   const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
 
@@ -230,7 +230,7 @@ function generateWorksheetHTML(ws, teacherMode) {
         ${(q.options||[]).map((o,oi) => `
           <div class="mcq-option">
             <div class="mcq-circle"></div>
-            (${String.fromCharCode(65+oi)}) &nbsp; ${_pvEsc(o)}
+            (${String.fromCharCode(65+oi)}) &nbsp; ${_esc(o)}
           </div>`).join("")}
       </div>`;
     } else {
@@ -243,8 +243,8 @@ function generateWorksheetHTML(ws, teacherMode) {
         <div class="ans-blank"></div>
       </div>`;
     }
-    const ansRow  = teacherMode && q.answer  ? `<div class="answer-key-inline">Ans: ${_pvEsc(q.answer)}</div>`   : "";
-    const wrkRow  = teacherMode && q.working ? `<div class="working-key-inline">${_pvEsc(q.working)}</div>`       : "";
+    const ansRow  = teacherMode && q.answer  ? `<div class="answer-key-inline">Ans: ${_esc(q.answer)}</div>`   : "";
+    const wrkRow  = teacherMode && q.working ? `<div class="working-key-inline">${_esc(q.working)}</div>`       : "";
 
     const diagramHtml = q.diagramImage
       ? `<img class="diagram-img" src="${q.diagramImage}" alt="Diagram for Q${i+1}" />`
@@ -254,7 +254,7 @@ function generateWorksheetHTML(ws, teacherMode) {
       <div class="question">
         <div class="question-stem">
           <span class="q-number">Q${i+1}.</span>
-          <span class="q-text">${_pvEsc(q.text)}</span>
+          <span class="q-text">${_esc(q.text)}</span>
           <span class="q-marks">[${q.marks||1}m]</span>
         </div>
         ${diagramHtml}${body}${ansRow}${wrkRow}
@@ -265,8 +265,8 @@ function generateWorksheetHTML(ws, teacherMode) {
     const rows = (ws.questions||[]).map((q,i) => `
       <tr>
         <td>Q${i+1}</td>
-        <td>${_pvEsc(q.answer||"—")}</td>
-        <td class="wt">${_pvEsc(q.working||"")}</td>
+        <td>${_esc(q.answer||"—")}</td>
+        <td class="wt">${_esc(q.working||"")}</td>
         <td>${q.marks||1}</td>
       </tr>`).join("");
     return `
@@ -287,7 +287,7 @@ function generateWorksheetHTML(ws, teacherMode) {
   return `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="UTF-8"/>
-<title>${_pvEsc(ws.title)}</title>
+<title>${_esc(ws.title)}</title>
 <style>
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:"Times New Roman",Times,serif;font-size:13pt;color:#000;background:#e8e8e8;padding:24px}
@@ -344,12 +344,12 @@ function generateWorksheetHTML(ws, teacherMode) {
   <div class="ws-header">
     <div class="ws-logo">${window.LOGO_DATA_URL ? `<img src="${window.LOGO_DATA_URL}" alt="Logo" />` : ""}</div>
     <div class="ws-title-block">
-      <h1>${_pvEsc((ws.subject||"Maths")+" Worksheet")}</h1>
+      <h1>${_esc((ws.subject||"Maths")+" Worksheet")}</h1>
       <div class="ws-meta">
-        ${ws.level ? `<span>Level: <span class="badge badge-level">${_pvEsc(ws.level)}</span></span>` : ""}
-        <span>Topic: ${_pvEsc(ws.topic||"—")} ${flagBadge}</span>
-        ${ws.difficulty ? `<span>Difficulty: ${_pvEsc(ws.difficulty)}</span>` : ""}
-        ${ws.type       ? `<span>Type: ${_pvEsc(ws.type)}</span>` : ""}
+        ${ws.level ? `<span>Level: <span class="badge badge-level">${_esc(ws.level)}</span></span>` : ""}
+        <span>Topic: ${_esc(ws.topic||"—")} ${flagBadge}</span>
+        ${ws.difficulty ? `<span>Difficulty: ${_esc(ws.difficulty)}</span>` : ""}
+        ${ws.type       ? `<span>Type: ${_esc(ws.type)}</span>` : ""}
       </div>
     </div>
   </div>
@@ -364,7 +364,7 @@ function generateWorksheetHTML(ws, teacherMode) {
   </div>
   ${questionsHtml}
   <div class="ws-footer">
-    <span>${_pvEsc(ws.title)}</span>
+    <span>${_esc(ws.title)}</span>
     <div class="marks-box">Total: &nbsp;&nbsp;&nbsp;&nbsp; / ${totalMarks} marks</div>
   </div>
   ${answerKeyHtml}
@@ -598,14 +598,3 @@ function _injectPreviewStyles() {
   document.head.appendChild(s);
 }
 
-// ---------------------------------------------------------------------------
-// Private escape helper
-// ---------------------------------------------------------------------------
-
-function _pvEsc(str) {
-  return String(str ?? "")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;");
-}

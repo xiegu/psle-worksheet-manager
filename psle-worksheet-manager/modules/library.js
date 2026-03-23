@@ -829,7 +829,17 @@ async function _handleRecordScore(wsId) {
   const stu = getActiveStudent();
   if (!ws || !stu) return;
 
-  const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
+  const totalMarks     = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
+  const today          = new Date().toISOString().slice(0,10);
+  const existingScores = getScoresForWorksheet(stu.id, wsId);
+
+  // Show previous scores if any
+  const prevHtml = existingScores.length > 0
+    ? `<div class="score-prev-notice">
+        <strong>Previous:</strong>
+        ${existingScores.map(s => `${s.score}/${s.total} on ${_esc(s.date)}`).join(" &bull; ")}
+       </div>`
+    : "";
 
   document.getElementById("score-modal")?.remove();
   const modal = document.createElement("div");
@@ -842,9 +852,10 @@ async function _handleRecordScore(wsId) {
         <button class="qb-modal__close" id="score-modal-close" aria-label="Close">&times;</button>
       </div>
       <div class="qb-modal__body score-form">
-        <div style="margin-bottom:12px;font-size:13px;color:var(--grey-600)">
+        <div style="margin-bottom:8px;font-size:13px;color:var(--grey-600)">
           ${_esc(ws.title||"Untitled")} &mdash; ${_esc(stu.name)}
         </div>
+        ${prevHtml}
         <div class="form-group" style="margin-bottom:12px">
           <label>Total Marks</label>
           <input type="number" id="score-total" value="${totalMarks}" min="1" />
@@ -855,7 +866,7 @@ async function _handleRecordScore(wsId) {
         </div>
         <div class="form-group">
           <label>Date</label>
-          <input type="date" id="score-date" value="${new Date().toISOString().slice(0,10)}" />
+          <input type="date" id="score-date" value="${today}" />
         </div>
       </div>
       <div class="qb-modal__footer">
@@ -874,12 +885,23 @@ async function _handleRecordScore(wsId) {
   document.getElementById("score-modal-save")?.addEventListener("click", async () => {
     const obtained = parseInt(document.getElementById("score-obtained")?.value);
     const total    = parseInt(document.getElementById("score-total")?.value);
-    const date     = document.getElementById("score-date")?.value
-                     || new Date().toISOString().slice(0,10);
+    const date     = document.getElementById("score-date")?.value || today;
 
-    if (isNaN(obtained) || obtained < 0) { showToast("Enter a valid score.",            "error"); return; }
-    if (isNaN(total)    || total < 1)    { showToast("Total marks must be at least 1.", "error"); return; }
-    if (obtained > total)                { showToast("Score cannot exceed total marks.", "error"); return; }
+    if (isNaN(obtained) || obtained < 0) { showToast("Enter a valid score (0 or more).",           "error"); return; }
+    if (isNaN(total)    || total    < 1) { showToast("Total marks must be at least 1.",             "error"); return; }
+    if (obtained > total)                { showToast(`Score ${obtained} exceeds total ${total}.`,   "error"); return; }
+
+    // Duplicate guard: warn if a score for the same date already exists
+    const dupOnDate = existingScores.find(s => s.wsId === wsId && s.date === date);
+    if (dupOnDate) {
+      if (!confirm(`A score (${dupOnDate.score}/${dupOnDate.total}) is already recorded for ${date}. Replace it?`)) return;
+      // Remove the duplicate entry by re-saving the student without it
+      const freshStu = await getStudent(stu.id);
+      if (freshStu) {
+        freshStu.scores = (freshStu.scores||[]).filter(s => !(s.wsId === wsId && s.date === date));
+        await saveStudent(freshStu);
+      }
+    }
 
     await recordScore(stu.id, wsId, obtained, total, date);
 
@@ -897,14 +919,3 @@ async function _handleRecordScore(wsId) {
   document.getElementById("score-obtained")?.focus();
 }
 
-// ---------------------------------------------------------------------------
-// Escape helper
-// ---------------------------------------------------------------------------
-
-function _esc(str) {
-  return String(str ?? "")
-    .replace(/&/g,"&amp;")
-    .replace(/</g,"&lt;")
-    .replace(/>/g,"&gt;")
-    .replace(/"/g,"&quot;");
-}
