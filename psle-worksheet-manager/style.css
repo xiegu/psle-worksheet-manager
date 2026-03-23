@@ -1168,6 +1168,20 @@ button { cursor: pointer; font-family: inherit; }
   font-weight: 400;
 }
 
+/* QB pagination bar */
+.qb-pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  justify-content: center;
+}
+
+.qb-pagination__info {
+  font-size: 13px;
+  color: var(--grey-600);
+}
+
 /* Previous-score notice in Record Score modal */
 .score-prev-notice {
   font-size: 12px;

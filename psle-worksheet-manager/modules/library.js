@@ -10,8 +10,8 @@
 // Module state — persists within session
 // ---------------------------------------------------------------------------
 
-let _wsFilters    = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
-let _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"", school:"", year:"", subject:"", paperType:"" };
+let _wsFilters    = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"", search:"" };
+let _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"", school:"", year:"", subject:"", paperType:"", search:"" };
 let _activeTab    = "worksheets";
 
 // Dynamic filter options for Available Papers — populated from actual data
@@ -156,6 +156,12 @@ function _htmlFilterBar(prefix, filters) {
 
   return `
     <div class="filter-bar">
+      <div class="filter-group" style="min-width:180px;flex:1">
+        <label>Search</label>
+        <input type="search" id="${p}-search" placeholder="Filter by title…"
+               value="${_esc(filters.search||"")}"
+               style="padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;width:100%" />
+      </div>
       <div class="filter-group">
         <label>Level</label>
         <select id="${p}-level">
@@ -301,6 +307,10 @@ function _parsePaperMeta(ws) {
 
 function _applyFilters(list, filters) {
   return list.filter(ws => {
+    if (filters.search) {
+      const s = filters.search.toLowerCase();
+      if (!(ws.title||"").toLowerCase().includes(s)) return false;
+    }
     if (filters.level      && ws.level      !== filters.level)      return false;
     if (filters.strand     && ws.strand     !== filters.strand)     return false;
     if (filters.topic      && ws.topic      !== filters.topic)      return false;
@@ -690,6 +700,10 @@ function _bindFilterBar(prefix) {
   const filters = prefix === "ws" ? _wsFilters : _paperFilters;
   const p = `fil-${prefix}`;
 
+  document.getElementById(`${p}-search`)?.addEventListener("input", e => {
+    filters.search = e.target.value;
+    _renderTabGrid(_activeTab);
+  });
   document.getElementById(`${p}-level`)?.addEventListener("change", e => {
     filters.level = e.target.value; filters.strand = ""; filters.topic = "";
     _rebuildFilterBar(prefix);
@@ -708,8 +722,8 @@ function _bindFilterBar(prefix) {
     });
   }
   document.getElementById(`btn-filter-reset-${prefix}`)?.addEventListener("click", () => {
-    if (prefix === "ws") _wsFilters    = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
-    else                 _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"", school:"", year:"", subject:"", paperType:"" };
+    if (prefix === "ws") _wsFilters    = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"", search:"" };
+    else                 _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"", school:"", year:"", subject:"", paperType:"", search:"" };
     _rebuildFilterBar(prefix);
   });
 }

@@ -12,7 +12,8 @@ let _qbFilters = {
   topic:       "",
   difficulty:  "",
   qtype:       "",  // "mcq" | "short_answer" | "long_answer"
-  builtFilter: ""   // "" = All, "built" = Built only, "not-built" = Not built only
+  builtFilter: "", // "" = All, "built" = Built only, "not-built" = Not built only
+  search:      ""  // free-text search on question text / paper title
 };
 
 let _selected        = new Set(); // set of composite keys "wsId::qId"
@@ -22,6 +23,10 @@ let _builtSourceKeys = new Set(); // sourceKeys present in any active worksheet 
 let _enrichedQCache       = null;
 let _builtSourceKeysCache = null;
 
+// Pagination
+const _QB_PAGE_SIZE = 30;
+let   _qbPage       = 0;
+
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
@@ -30,6 +35,7 @@ async function renderQuestionBank(container) {
   _selected.clear();
   _enrichedQCache       = null;  // reset caches on full render
   _builtSourceKeysCache = null;
+  _qbPage               = 0;
   const allQ = await _getAllEnrichedQuestions();
 
   container.innerHTML = `
@@ -124,6 +130,12 @@ function _htmlQBFilterBar() {
 
   return `
     <div class="filter-bar" id="qb-filter-bar">
+      <div class="filter-group" style="min-width:180px;flex:1">
+        <label>Search</label>
+        <input type="search" id="qbf-search" placeholder="Search question text or paper…"
+               value="${_esc(_qbFilters.search)}"
+               style="padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;width:100%" />
+      </div>
       <div class="filter-group">
         <label>Level</label>
         <select id="qbf-level">
@@ -184,6 +196,11 @@ function _htmlQBFilterBar() {
 
 function _applyQBFilters(allQ) {
   return allQ.filter(q => {
+    if (_qbFilters.search) {
+      const s = _qbFilters.search.toLowerCase();
+      if (!(q.text||"").toLowerCase().includes(s) &&
+          !(q._wsTitle||"").toLowerCase().includes(s)) return false;
+    }
     if (_qbFilters.level      && q._wsLevel      !== _qbFilters.level)      return false;
     if (_qbFilters.strand     && q._wsStrand     !== _qbFilters.strand)     return false;
     if (_qbFilters.topic      && q._wsTopic      !== _qbFilters.topic)      return false;
@@ -241,7 +258,10 @@ async function _renderQBGrid() {
   }
   _builtSourceKeys = _builtSourceKeysCache;
 
-  const filtered = _applyQBFilters(allQ);
+  const filtered   = _applyQBFilters(allQ);
+  const totalPages = Math.ceil(filtered.length / _QB_PAGE_SIZE) || 1;
+  _qbPage = Math.min(_qbPage, totalPages - 1);
+  const paged = filtered.slice(_qbPage * _QB_PAGE_SIZE, (_qbPage + 1) * _QB_PAGE_SIZE);
 
   selBar.innerHTML = _htmlSelectionBar(filtered.length);
   _bindSelectionBar(filtered);
@@ -259,8 +279,42 @@ async function _renderQBGrid() {
     return;
   }
 
-  wrap.innerHTML = `<div class="qb-grid">${filtered.map(q => _htmlQCard(q, _builtSourceKeys)).join("")}</div>`;
+  wrap.innerHTML = `
+    ${_htmlQBPagination(filtered.length, totalPages)}
+    <div class="qb-grid">${paged.map(q => _htmlQCard(q, _builtSourceKeys)).join("")}</div>
+    ${totalPages > 1 ? _htmlQBPagination(filtered.length, totalPages, "bottom") : ""}
+  `;
   _bindQBCardActions();
+  _bindQBPagination();
+}
+
+// ---------------------------------------------------------------------------
+// Pagination
+// ---------------------------------------------------------------------------
+
+function _htmlQBPagination(total, totalPages, pos) {
+  if (totalPages <= 1) return "";
+  const start = _qbPage * _QB_PAGE_SIZE + 1;
+  const end   = Math.min((_qbPage + 1) * _QB_PAGE_SIZE, total);
+  const suffix = pos === "bottom" ? "-bot" : "";
+  return `
+    <div class="qb-pagination">
+      <button class="btn btn-sm" id="qb-prev${suffix}" ${_qbPage === 0 ? "disabled" : ""}>&#8592; Prev</button>
+      <span class="qb-pagination__info">Showing ${start}–${end} of ${total}</span>
+      <button class="btn btn-sm" id="qb-next${suffix}" ${_qbPage >= totalPages - 1 ? "disabled" : ""}>Next &#8594;</button>
+    </div>`;
+}
+
+function _bindQBPagination() {
+  const goTo = page => {
+    _qbPage = page;
+    _renderQBGrid();
+    document.getElementById("qb-grid-wrap")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  document.getElementById("qb-prev")?.addEventListener("click", () => goTo(Math.max(0, _qbPage - 1)));
+  document.getElementById("qb-next")?.addEventListener("click", () => goTo(_qbPage + 1));
+  document.getElementById("qb-prev-bot")?.addEventListener("click", () => goTo(Math.max(0, _qbPage - 1)));
+  document.getElementById("qb-next-bot")?.addEventListener("click", () => goTo(_qbPage + 1));
 }
 
 // ---------------------------------------------------------------------------
@@ -342,6 +396,12 @@ function _htmlQCard(q, builtSourceKeys) {
 // ---------------------------------------------------------------------------
 
 function _bindQBFilters() {
+  document.getElementById("qbf-search")?.addEventListener("input", e => {
+    _qbFilters.search = e.target.value;
+    _qbPage = 0;
+    _renderQBGrid();
+  });
+
   document.getElementById("qbf-level")?.addEventListener("change", e => {
     _qbFilters.level  = e.target.value;
     _qbFilters.strand = "";
@@ -358,23 +418,27 @@ function _bindQBFilters() {
   [["qbf-topic","topic"],["qbf-qtype","qtype"],["qbf-difficulty","difficulty"]].forEach(([id, key]) => {
     document.getElementById(id)?.addEventListener("change", e => {
       _qbFilters[key] = e.target.value;
+      _qbPage = 0;
       _renderQBGrid();
     });
   });
 
   document.getElementById("qbf-built")?.addEventListener("change", e => {
     _qbFilters.builtFilter = e.target.value;
+    _qbPage = 0;
     _renderQBGrid();
   });
 
   document.getElementById("qbf-reset")?.addEventListener("click", () => {
-    _qbFilters = { level:"", strand:"", topic:"", difficulty:"", qtype:"", builtFilter:"" };
+    _qbFilters = { level:"", strand:"", topic:"", difficulty:"", qtype:"", builtFilter:"", search:"" };
+    _qbPage = 0;
     _rebuildQBFilterBar();
   });
 }
 
 function _rebuildQBFilterBar() {
   const focusedId = document.activeElement?.id;
+  _qbPage = 0;
   const bar = document.getElementById("qb-filter-bar");
   if (!bar) return;
   bar.outerHTML = _htmlQBFilterBar();
