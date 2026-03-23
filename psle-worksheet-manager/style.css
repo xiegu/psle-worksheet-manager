@@ -217,11 +217,22 @@ button { cursor: pointer; font-family: inherit; }
 
 .lib-tab.active {
   background: #fff;
-  color: var(--blue);
   font-weight: 700;
-  border-color: var(--border);
   border-bottom-color: #fff;
 }
+
+/* Per-tab accent colours */
+.lib-tab[data-tab="worksheets"]:hover      { background: #eff6ff; color: #1d4ed8; }
+.lib-tab[data-tab="worksheets"].active     { color: #1d4ed8; border-color: #93c5fd; border-bottom-color: #fff; }
+
+.lib-tab[data-tab="papers"]:hover          { background: #f0fdf4; color: #065f46; }
+.lib-tab[data-tab="papers"].active         { color: #065f46; border-color: #6ee7b7; border-bottom-color: #fff; }
+
+.lib-tab[data-tab="archived-ws"]:hover     { background: #fffbeb; color: #92400e; }
+.lib-tab[data-tab="archived-ws"].active    { color: #92400e; border-color: #fcd34d; border-bottom-color: #fff; }
+
+.lib-tab[data-tab="archived-papers"]:hover  { background: #f5f3ff; color: #5b21b6; }
+.lib-tab[data-tab="archived-papers"].active { color: #5b21b6; border-color: #c4b5fd; border-bottom-color: #fff; }
 
 .lib-count {
   font-size: 12px;

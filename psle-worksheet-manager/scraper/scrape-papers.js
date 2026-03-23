@@ -697,6 +697,10 @@ async function processPaper(client, paper) {
     id,
     title:      paper.title,
     level:      paper.level,
+    school:     paper.school     || "",
+    year:       String(paper.year || ""),
+    subject:    paper.subject    || "Maths",
+    paperType:  paper.paperType  || "",
     strand:     dominantStrand,
     topic:      "",   // mixed paper — tutor can refine per-question in Question Bank
     difficulty: "Standard",

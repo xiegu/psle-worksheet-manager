@@ -11,8 +11,11 @@
 // ---------------------------------------------------------------------------
 
 let _wsFilters    = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
-let _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
+let _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"", school:"", year:"", subject:"", paperType:"" };
 let _activeTab    = "worksheets";
+
+// Dynamic filter options for Available Papers — populated from actual data
+let _paperFilterOptions = { schools:[], years:[], subjects:[], paperTypes:[] };
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -201,6 +204,50 @@ function _htmlFilterBar(prefix, filters) {
           ).join("")}
         </select>
       </div>
+      ${prefix === "paper" && _paperFilterOptions.schools.length ? `
+      <div class="filter-group">
+        <label>School</label>
+        <select id="${p}-school">
+          <option value="">All</option>
+          ${_paperFilterOptions.schools.map(s =>
+            `<option value="${_esc(s)}" ${filters.school===s?"selected":""}>${_esc(s)}</option>`
+          ).join("")}
+        </select>
+      </div>` : ""}
+
+      ${prefix === "paper" && _paperFilterOptions.years.length ? `
+      <div class="filter-group">
+        <label>Year</label>
+        <select id="${p}-year">
+          <option value="">All</option>
+          ${_paperFilterOptions.years.map(y =>
+            `<option value="${_esc(y)}" ${filters.year===y?"selected":""}>${_esc(y)}</option>`
+          ).join("")}
+        </select>
+      </div>` : ""}
+
+      ${prefix === "paper" && _paperFilterOptions.subjects.length > 1 ? `
+      <div class="filter-group">
+        <label>Subject</label>
+        <select id="${p}-subject">
+          <option value="">All</option>
+          ${_paperFilterOptions.subjects.map(s =>
+            `<option value="${_esc(s)}" ${filters.subject===s?"selected":""}>${_esc(s)}</option>`
+          ).join("")}
+        </select>
+      </div>` : ""}
+
+      ${prefix === "paper" && _paperFilterOptions.paperTypes.length ? `
+      <div class="filter-group">
+        <label>Paper Type</label>
+        <select id="${p}-paperType">
+          <option value="">All</option>
+          ${_paperFilterOptions.paperTypes.map(t =>
+            `<option value="${_esc(t)}" ${filters.paperType===t?"selected":""}>${_esc(t)}</option>`
+          ).join("")}
+        </select>
+      </div>` : ""}
+
       <button class="filter-reset" id="btn-filter-reset-${prefix}">Reset</button>
     </div>
   `;
@@ -217,6 +264,10 @@ function _applyFilters(list, filters) {
     if (filters.topic      && ws.topic      !== filters.topic)      return false;
     if (filters.difficulty && ws.difficulty !== filters.difficulty) return false;
     if (filters.type       && ws.type       !== filters.type)       return false;
+    if (filters.school     && ws.school     !== filters.school)     return false;
+    if (filters.year       && ws.year       !== filters.year)       return false;
+    if (filters.subject    && ws.subject    !== filters.subject)    return false;
+    if (filters.paperType  && ws.paperType  !== filters.paperType)  return false;
     if (filters.flag) {
       const f = getFlag(ws.topic);
       if (!f || f.flag !== filters.flag) return false;
@@ -246,6 +297,13 @@ async function _renderTabGrid(tab, allParam) {
 
   } else if (tab === "papers") {
     const base  = all.filter(w => w.origin === "imported" && w.status !== "archived");
+    // Refresh dynamic filter options from current data
+    _paperFilterOptions = {
+      schools:    [...new Set(base.map(p => p.school).filter(Boolean))].sort(),
+      years:      [...new Set(base.map(p => p.year).filter(Boolean))].sort((a,b) => b-a),
+      subjects:   [...new Set(base.map(p => p.subject).filter(Boolean))].sort(),
+      paperTypes: [...new Set(base.map(p => p.paperType).filter(Boolean))].sort()
+    };
     const items = _applyFilters(base, _paperFilters);
     _renderGrid("grid-active-papers", items, "paper", false, builtSourceKeys,
       base.length === 0
@@ -426,7 +484,10 @@ function _bindFilterBar(prefix) {
     filters.strand = e.target.value; filters.topic = "";
     _rebuildFilterBar(prefix);
   });
-  for (const key of ["topic","difficulty","type","flag"]) {
+  const simpleKeys = prefix === "paper"
+    ? ["topic","difficulty","type","flag","school","year","subject","paperType"]
+    : ["topic","difficulty","type","flag"];
+  for (const key of simpleKeys) {
     document.getElementById(`${p}-${key}`)?.addEventListener("change", e => {
       filters[key] = e.target.value;
       _renderTabGrid(_activeTab);
@@ -434,7 +495,7 @@ function _bindFilterBar(prefix) {
   }
   document.getElementById(`btn-filter-reset-${prefix}`)?.addEventListener("click", () => {
     if (prefix === "ws") _wsFilters    = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
-    else                 _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"" };
+    else                 _paperFilters = { level:"", strand:"", topic:"", difficulty:"", type:"", flag:"", school:"", year:"", subject:"", paperType:"" };
     _rebuildFilterBar(prefix);
   });
 }
