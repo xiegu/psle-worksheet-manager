@@ -605,6 +605,9 @@ function _bindQuestions() {
     const card    = e.target.closest(".question-card");
     if (!card || _dragSrcIdx === null) return;
     const destIdx = parseInt(card.dataset.idx);
+    const n = _questions.length;
+    if (isNaN(destIdx) || destIdx < 0 || destIdx >= n) return;
+    if (_dragSrcIdx < 0 || _dragSrcIdx >= n) return;
     if (destIdx === _dragSrcIdx) return;
 
     _saveUndo();
@@ -846,7 +849,8 @@ async function _showQBPickerModal() {
   const close = () => modal.remove();
   document.getElementById("builder-qb-close")?.addEventListener("click",  close);
   document.getElementById("builder-qb-cancel")?.addEventListener("click", close);
-  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+  modal.addEventListener("click",   e => { if (e.target === modal) close(); });
+  modal.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
 
   document.getElementById("builder-qb-level")?.addEventListener("change", e => {
     levelFilter = e.target.value;

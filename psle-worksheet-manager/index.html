@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PSLE 2026 Worksheet Manager</title>
-  <link rel="stylesheet" href="style.css?v=17" />
+  <link rel="stylesheet" href="style.css?v=18" />
 </head>
 <body>
 
@@ -20,24 +20,24 @@
       </div>
     </div>
 
-    <nav class="app-nav">
-      <button class="nav-btn active" data-view="library">
-        <span class="nav-icon">&#9776;</span> Library
+    <nav class="app-nav" role="navigation" aria-label="Main navigation">
+      <button class="nav-btn active" data-view="library" aria-current="page">
+        <span class="nav-icon" aria-hidden="true">&#9776;</span> Library
       </button>
       <button class="nav-btn" data-view="builder">
-        <span class="nav-icon">&#43;</span> New Worksheet
+        <span class="nav-icon" aria-hidden="true">&#43;</span> New Worksheet
       </button>
       <button class="nav-btn" data-view="questionbank">
-        <span class="nav-icon">&#10067;</span> Question Bank
+        <span class="nav-icon" aria-hidden="true">&#10067;</span> Question Bank
       </button>
-      <button class="nav-btn" data-view="students">&#128100; Students</button>
+      <button class="nav-btn" data-view="students"><span aria-hidden="true">&#128100;</span> Students</button>
     </nav>
 
     <div class="app-header__actions">
       <div id="active-student-indicator"></div>
-      <button class="icon-btn" id="btn-export" title="Export backup">&#8595; Export</button>
-      <button class="icon-btn" id="btn-import" title="Import backup">&#8593; Import</button>
-      <input type="file" id="import-file-input" accept=".json" style="display:none" />
+      <button class="icon-btn" id="btn-export" title="Export backup" aria-label="Export backup as JSON">&#8595; Export</button>
+      <button class="icon-btn" id="btn-import" title="Import backup" aria-label="Import backup from JSON">&#8593; Import</button>
+      <input type="file" id="import-file-input" accept=".json" style="display:none" aria-hidden="true" />
     </div>
   </header>
 
@@ -56,15 +56,15 @@
   <!-- =====================================================================
        Scripts — order matters: data → storage → modules → router
   ====================================================================== -->
-  <script src="data/syllabus.js?v=17"></script>
-  <script src="modules/utils.js?v=17"></script>
-  <script src="modules/storage.js?v=17"></script>
-  <script src="modules/students.js?v=17"></script>
-  <script src="modules/library.js?v=17"></script>
-  <script src="modules/builder.js?v=17"></script>
-  <script src="modules/preview.js?v=17"></script>
-  <script src="modules/questionbank.js?v=17"></script>
-  <script src="app.js?v=17"></script>
+  <script src="data/syllabus.js?v=18"></script>
+  <script src="modules/utils.js?v=18"></script>
+  <script src="modules/storage.js?v=18"></script>
+  <script src="modules/students.js?v=18"></script>
+  <script src="modules/library.js?v=18"></script>
+  <script src="modules/builder.js?v=18"></script>
+  <script src="modules/preview.js?v=18"></script>
+  <script src="modules/questionbank.js?v=18"></script>
+  <script src="app.js?v=18"></script>
 
 </body>
 </html>

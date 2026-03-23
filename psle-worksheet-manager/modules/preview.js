@@ -295,6 +295,7 @@ function generateWorksheetHTML(ws, teacherMode) {
   .ws-header{display:flex;align-items:center;gap:14px;border-bottom:2.5px solid #000;padding-bottom:8px;margin-bottom:10px}
   .ws-logo{width:100px;height:100px;border-radius:4px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
   .ws-logo img{width:100%;height:100%;object-fit:contain}
+  .ws-logo__placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:22pt;font-weight:800;color:#1a56a0;letter-spacing:.05em;background:#e8f0fb;border-radius:4px}
   .ws-title-block{flex:1}
   .ws-title-block h1{font-size:16pt;font-weight:bold;letter-spacing:.04em;text-transform:uppercase}
   .ws-meta{font-size:10pt;color:#333;margin-top:3px;display:flex;gap:18px;flex-wrap:wrap}
@@ -314,7 +315,7 @@ function generateWorksheetHTML(ws, teacherMode) {
   .question-stem{display:flex;gap:8px;align-items:baseline;margin-bottom:6px}
   .q-number{font-weight:bold;min-width:28px;flex-shrink:0}
   .q-marks{font-size:9pt;color:#555;white-space:nowrap;flex-shrink:0}
-  .q-text{flex:1;line-height:1.5}
+  .q-text{flex:1;line-height:1.5;overflow-wrap:break-word;word-break:break-word}
   .working-space{margin-left:36px;margin-top:4px}
   .working-line{border-bottom:1px dotted #bbb;height:22px;width:100%}
   .answer-box{margin-left:36px;margin-top:6px;display:flex;align-items:center;gap:10px}
@@ -325,16 +326,18 @@ function generateWorksheetHTML(ws, teacherMode) {
   .mcq-circle{width:14px;height:14px;border:1.5px solid #000;border-radius:50%;display:inline-block;flex-shrink:0}
   .answer-key-inline{margin-left:36px;margin-top:4px;font-size:10pt;color:#1a7a3c;font-weight:600}
   .working-key-inline{margin-left:36px;font-size:9.5pt;color:#555;font-style:italic}
-  .diagram-img{display:block;max-width:100%;max-height:110mm;margin:6px 0 8px 36px;border:1px solid #ccc;border-radius:2px}
-  .wt{font-size:9.5pt;color:#555;font-style:italic}
+  .diagram-img{display:block;max-width:90%;max-height:110mm;margin:6px 0 8px 36px;border:1px solid #ccc;border-radius:2px}
+  .wt{font-size:9.5pt;color:#555;font-style:italic;overflow-wrap:break-word}
   td,th{border:1px solid #ccc;padding:5px 10px;text-align:left}
   .ws-footer{border-top:2px solid #000;margin-top:20px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11pt}
   .marks-box{border:1.5px solid #000;padding:4px 14px;font-size:12pt;font-weight:bold}
   @media print{
-    body{background:none;padding:0}
+    body{background:none;padding:0;orphans:2;widows:2}
     .page{width:210mm;min-height:297mm;margin:0;padding:15mm;box-shadow:none;page-break-after:always}
-    .question{page-break-inside:avoid}
+    .question{page-break-inside:avoid;break-inside:avoid}
+    .diagram-img{max-height:80mm}
     .badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .ws-logo__placeholder{display:none}
     @page{size:A4 portrait;margin:0}
   }
 </style>
@@ -342,7 +345,7 @@ function generateWorksheetHTML(ws, teacherMode) {
 <div class="page">
   <div class="teacher-watermark">ANSWER KEY</div>
   <div class="ws-header">
-    <div class="ws-logo">${window.LOGO_DATA_URL ? `<img src="${window.LOGO_DATA_URL}" alt="Logo" />` : ""}</div>
+    <div class="ws-logo">${window.LOGO_DATA_URL ? `<img src="${window.LOGO_DATA_URL}" alt="Logo" />` : `<div class="ws-logo__placeholder">WM</div>`}</div>
     <div class="ws-title-block">
       <h1>${_esc((ws.subject||"Maths")+" Worksheet")}</h1>
       <div class="ws-meta">

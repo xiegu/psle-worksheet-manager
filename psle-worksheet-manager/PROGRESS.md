@@ -92,13 +92,10 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 ### High priority
 - [ ] **Rotate API key** ([#1](https://github.com/xiegu/psle-worksheet-manager/issues/1)) — revoke old key at `platform.claude.com/settings/api-keys` *(manual step)*
 - [ ] **Scrape more papers** ([#3](https://github.com/xiegu/psle-worksheet-manager/issues/3)) — run scraper for other schools, years, levels (P5, P4)
-- [ ] **Fix drag-drop index validation** ([#21](https://github.com/xiegu/psle-worksheet-manager/issues/21)) — bounds check + archive error handling
 
 ### Enhancements
 - [ ] **Batch print** ([#4](https://github.com/xiegu/psle-worksheet-manager/issues/4)) — print multiple worksheets in one browser print session
 - [ ] **Separate answer key sheet** ([#5](https://github.com/xiegu/psle-worksheet-manager/issues/5)) — printable answer key on its own page
-- [ ] **Print output improvements** ([#15](https://github.com/xiegu/psle-worksheet-manager/issues/15)) — logo fallback, text overflow, page break orphans, diagram size limit
-- [ ] **Accessibility** ([#16](https://github.com/xiegu/psle-worksheet-manager/issues/16)) — keyboard nav, ARIA labels, Enter-to-submit
 
 ---
 
@@ -106,6 +103,9 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 | Issue | What was done |
 |-------|---------------|
+| [#21](https://github.com/xiegu/psle-worksheet-manager/issues/21) | Drag-drop bounds check (NaN + range guard); bulk archive error reporting |
+| [#16](https://github.com/xiegu/psle-worksheet-manager/issues/16) | Accessibility — `aria-current` on nav, `role/aria-label` on nav+icons, Escape closes all modals, Enter submits score + student-add inputs |
+| [#15](https://github.com/xiegu/psle-worksheet-manager/issues/15) | Print improvements — logo fallback placeholder, `overflow-wrap` on q-text, `orphans/widows:2`, `break-inside:avoid`, diagram capped to 80mm in print |
 | [#24](https://github.com/xiegu/psle-worksheet-manager/issues/24) | Subject-aware titles — preview + print use `ws.subject\|\|"Maths"` + " Worksheet" |
 | [#23](https://github.com/xiegu/psle-worksheet-manager/issues/23) | QB caching — `_enrichedQCache` + `_builtSourceKeysCache`; reset on full render |
 | [#22](https://github.com/xiegu/psle-worksheet-manager/issues/22) | Focus preservation — filter rebuilds restore `document.activeElement` |
@@ -144,4 +144,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-24 — 6 open issues remain; completed #13, #14, #17–#19, #22–#24 this session*
+*Last updated: 2026-03-24 — 3 open issues remain; completed #15, #16, #21 this session*

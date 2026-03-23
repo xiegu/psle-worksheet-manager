@@ -153,6 +153,10 @@ function _bindStudentLeftPanel() {
     showToast("Logged out.");
   });
 
+  document.getElementById("stu-new-name")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") document.getElementById("btn-stu-add")?.click();
+  });
+
   document.getElementById("btn-stu-add")?.addEventListener("click", async () => {
     const nameInput = document.getElementById("stu-new-name");
     const name = nameInput?.value.trim();

@@ -21,9 +21,12 @@ async function navigate(view, params = {}) {
   AppState.currentView = view;
   AppState.editingId   = params.editingId || null;
 
-  // Update nav button active states
+  // Update nav button active states + aria-current
   document.querySelectorAll(".nav-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.view === view);
+    const isActive = btn.dataset.view === view;
+    btn.classList.toggle("active", isActive);
+    if (isActive) btn.setAttribute("aria-current", "page");
+    else          btn.removeAttribute("aria-current");
   });
 
   const main = document.getElementById("app-main");

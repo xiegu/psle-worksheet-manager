@@ -443,9 +443,13 @@ function _bindBulkBar(type, isArchived) {
 
   document.getElementById("btn-bulk-archive")?.addEventListener("click", async () => {
     if (!confirm(`Archive ${_selectedCards.size} item(s)?`)) return;
-    for (const id of _selectedCards) { try { await archiveWorksheet(id); } catch(e) {} }
+    let failed = 0;
+    for (const id of _selectedCards) {
+      try { await archiveWorksheet(id); }
+      catch(e) { failed++; }
+    }
     _selectedCards.clear();
-    showToast("Archived.", "success");
+    showToast(failed ? `Archived with ${failed} error(s).` : "Archived.", failed ? "error" : "success");
     await _rerenderLibrary();
   });
 
@@ -509,7 +513,8 @@ function _showAssignTopicModal() {
   const close = () => modal.remove();
   document.getElementById("at-close")?.addEventListener("click", close);
   document.getElementById("at-cancel")?.addEventListener("click", close);
-  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+  modal.addEventListener("click",   e => { if (e.target === modal) close(); });
+  modal.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
 
   document.getElementById("at-level")?.addEventListener("change", e => {
     const strands  = e.target.value ? getStrands(e.target.value) : [];
@@ -894,7 +899,13 @@ async function _handleRecordScore(wsId) {
   const close = () => modal.remove();
   document.getElementById("score-modal-close")?.addEventListener("click",  close);
   document.getElementById("score-modal-cancel")?.addEventListener("click", close);
-  modal.addEventListener("click", e => { if (e.target === modal) close(); });
+  modal.addEventListener("click",   e => { if (e.target === modal) close(); });
+  modal.addEventListener("keydown", e => {
+    if (e.key === "Escape") { close(); return; }
+    if (e.key === "Enter" && e.target.tagName === "INPUT") {
+      document.getElementById("score-modal-save")?.click();
+    }
+  });
 
   document.getElementById("score-modal-save")?.addEventListener("click", async () => {
     const obtained = parseInt(document.getElementById("score-obtained")?.value);
