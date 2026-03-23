@@ -254,6 +254,42 @@ function _htmlFilterBar(prefix, filters) {
 }
 
 // ---------------------------------------------------------------------------
+// Paper metadata helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns {school, year, subject, paperType} for a worksheet.
+ * Uses explicit saved fields when present; falls back to parsing the title
+ * for papers imported before these fields were added to the scraper.
+ * Title format: "P6 Maths Prelim 2025 — Nanyang"
+ */
+function _parsePaperMeta(ws) {
+  let school    = ws.school    || "";
+  let year      = ws.year      || "";
+  let subject   = ws.subject   || "";
+  let paperType = ws.paperType || "";
+  const title   = ws.title     || "";
+
+  if (!year) {
+    const m = title.match(/\b(20\d{2})\b/);
+    if (m) year = m[1];
+  }
+  if (!school) {
+    const m = title.match(/[—–-]\s*(.+)$/);
+    if (m) school = m[1].trim();
+  }
+  if (!subject) {
+    const m = title.match(/\b(Maths?|Mathematics|Science|English|Chinese)\b/i);
+    if (m) subject = m[1].replace(/^Math$/i, "Maths").replace(/^Mathematics$/i, "Maths");
+  }
+  if (!paperType) {
+    const m = title.match(/\b(Prelim|SA[12]?|CA[12]?)\b/i);
+    if (m) paperType = m[1].toUpperCase().replace(/^SA$/, "SA").replace(/^CA$/, "CA");
+  }
+  return { school, year, subject, paperType };
+}
+
+// ---------------------------------------------------------------------------
 // Grid rendering
 // ---------------------------------------------------------------------------
 
@@ -264,10 +300,13 @@ function _applyFilters(list, filters) {
     if (filters.topic      && ws.topic      !== filters.topic)      return false;
     if (filters.difficulty && ws.difficulty !== filters.difficulty) return false;
     if (filters.type       && ws.type       !== filters.type)       return false;
-    if (filters.school     && ws.school     !== filters.school)     return false;
-    if (filters.year       && ws.year       !== filters.year)       return false;
-    if (filters.subject    && ws.subject    !== filters.subject)    return false;
-    if (filters.paperType  && ws.paperType  !== filters.paperType)  return false;
+    if (filters.school || filters.year || filters.subject || filters.paperType) {
+      const meta = _parsePaperMeta(ws);
+      if (filters.school    && meta.school    !== filters.school)    return false;
+      if (filters.year      && meta.year      !== filters.year)      return false;
+      if (filters.subject   && meta.subject   !== filters.subject)   return false;
+      if (filters.paperType && meta.paperType !== filters.paperType) return false;
+    }
     if (filters.flag) {
       const f = getFlag(ws.topic);
       if (!f || f.flag !== filters.flag) return false;
@@ -297,12 +336,13 @@ async function _renderTabGrid(tab, allParam) {
 
   } else if (tab === "papers") {
     const base  = all.filter(w => w.origin === "imported" && w.status !== "archived");
-    // Refresh dynamic filter options from current data
+    // Refresh dynamic filter options — use parsed fallback for older imported papers
+    const metas = base.map(_parsePaperMeta);
     _paperFilterOptions = {
-      schools:    [...new Set(base.map(p => p.school).filter(Boolean))].sort(),
-      years:      [...new Set(base.map(p => p.year).filter(Boolean))].sort((a,b) => b-a),
-      subjects:   [...new Set(base.map(p => p.subject).filter(Boolean))].sort(),
-      paperTypes: [...new Set(base.map(p => p.paperType).filter(Boolean))].sort()
+      schools:    [...new Set(metas.map(m => m.school).filter(Boolean))].sort(),
+      years:      [...new Set(metas.map(m => m.year).filter(Boolean))].sort((a,b) => b-a),
+      subjects:   [...new Set(metas.map(m => m.subject).filter(Boolean))].sort(),
+      paperTypes: [...new Set(metas.map(m => m.paperType).filter(Boolean))].sort()
     };
     const items = _applyFilters(base, _paperFilters);
     _renderGrid("grid-active-papers", items, "paper", false, builtSourceKeys,
