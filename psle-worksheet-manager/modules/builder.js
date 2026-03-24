@@ -303,7 +303,7 @@ function _htmlPreviewContent() {
             : ""}
           ${q.type === "mcq" && q.options
             ? `<div style="margin-left:22px;font-size:10px;color:#333">
-                ${(q.options||[]).map((o,oi)=>`<div>${String.fromCharCode(65+oi)}. ${_esc(o)}</div>`).join("")}
+                ${(q.options||[]).map((o,oi)=>`<div>${String.fromCharCode(65+oi)}. ${_esc(_stripOptionPrefix(o))}</div>`).join("")}
                </div>`
             : `<div class="preview-q-lines">
                 ${Array(q.type==="long_answer"?5:3).fill('<div class="preview-dotline"></div>').join("")}

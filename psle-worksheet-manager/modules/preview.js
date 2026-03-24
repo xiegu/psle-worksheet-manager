@@ -117,7 +117,7 @@ function _renderQuestion(q, i, teacherMode) {
       ${opts.map((o, oi) => `
         <div class="pv-mcq-option">
           <div class="pv-mcq-circle"></div>
-          (${String.fromCharCode(65 + oi)}) &nbsp; ${_esc(o)}
+          (${String.fromCharCode(65 + oi)}) &nbsp; ${_esc(_stripOptionPrefix(o))}
         </div>`).join("")}
     </div>`;
   } else {
@@ -230,7 +230,7 @@ function generateWorksheetHTML(ws, teacherMode) {
         ${(q.options||[]).map((o,oi) => `
           <div class="mcq-option">
             <div class="mcq-circle"></div>
-            (${String.fromCharCode(65+oi)}) &nbsp; ${_esc(o)}
+            (${String.fromCharCode(65+oi)}) &nbsp; ${_esc(_stripOptionPrefix(o))}
           </div>`).join("")}
       </div>`;
     } else {

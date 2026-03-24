@@ -352,7 +352,7 @@ function _htmlQCard(q, builtSourceKeys) {
   const optionsHtml = q.type === "mcq" && q.options
     ? `<div class="qb-card__options">
         ${(q.options||[]).slice(0,4).map((o,i) =>
-          `<div class="qb-card__option">${String.fromCharCode(65+i)}. ${_esc(o)}</div>`
+          `<div class="qb-card__option">${String.fromCharCode(65+i)}. ${_esc(_stripOptionPrefix(o))}</div>`
         ).join("")}
        </div>`
     : "";
@@ -582,7 +582,7 @@ function _showQPreviewModal(q) {
         ${(q.options||[]).map((o,i) => `
           <div class="qb-modal__option">
             <span class="qb-modal__option-letter">${String.fromCharCode(65+i)}.</span>
-            ${_esc(o)}
+            ${_esc(_stripOptionPrefix(o))}
           </div>`).join("")}
        </div>`
     : "";
