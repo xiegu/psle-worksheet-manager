@@ -99,6 +99,13 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 ---
 
+## Builder UX Improvements (2026-03-25)
+
+- **Auto-generated worksheet title** — title input in Step 1 now auto-fills from Level + Strand + Topic + Difficulty + Type dropdowns (e.g. `P6 Number — Fractions — Standard Practice`). User can freely edit the auto-title; once edited it stays; clearing the field re-enables auto-gen. Editing an existing worksheet preserves its title.
+- **Removed 2026 syllabus flag badges from builder, preview, and print** — "Moved to P6: Average" / "New: Ratio" labels no longer appear in the worksheet builder live preview, in-app preview panel, or printed output. The Speed blocked-topic warning is retained.
+
+---
+
 ## Completed Issues
 
 | Issue | What was done |
@@ -144,4 +151,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-24 — 3 open issues remain; completed #15, #16, #21 this session*
+*Last updated: 2026-03-25 — 3 open issues remain; builder UX improvements this session*

@@ -60,10 +60,6 @@ async function renderPreview(container, worksheetId) {
 // ---------------------------------------------------------------------------
 
 function _renderPage(ws, teacherMode) {
-  const flag       = ws.topic ? getFlag(ws.topic) : null;
-  const flagBadge  = flag
-    ? `<span class="ws-badge ws-badge--${flag.flag.replace("_","-")}">${_esc(flag.label)}</span>`
-    : "";
   const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
 
   const questionsHtml = (ws.questions||[]).length === 0
@@ -79,7 +75,7 @@ function _renderPage(ws, teacherMode) {
         <h1 class="pv-ws-title">${_esc((ws.subject||"Maths")+" Worksheet")}</h1>
         <div class="pv-ws-meta">
           ${ws.level      ? `<span>Level: <span class="ws-badge ws-badge--level">${_esc(ws.level)}</span></span>` : ""}
-          <span>Topic: ${_esc(ws.topic||"—")} ${flagBadge}</span>
+          <span>Topic: ${_esc(ws.topic||"—")}</span>
           ${ws.difficulty ? `<span>Difficulty: ${_esc(ws.difficulty)}</span>` : ""}
           ${ws.type       ? `<span>Type: ${_esc(ws.type)}</span>` : ""}
         </div>
@@ -217,10 +213,6 @@ function _bindPreview() {
  * @returns {string} Full HTML document
  */
 function generateWorksheetHTML(ws, teacherMode) {
-  const flag       = ws.topic ? getFlag(ws.topic) : null;
-  const flagBadge  = flag
-    ? `<span class="badge badge-${flag.flag.replace("_","-")}">${_esc(flag.label)}</span>`
-    : "";
   const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
 
   const questionsHtml = (ws.questions||[]).map((q, i) => {
@@ -350,7 +342,7 @@ function generateWorksheetHTML(ws, teacherMode) {
       <h1>${_esc((ws.subject||"Maths")+" Worksheet")}</h1>
       <div class="ws-meta">
         ${ws.level ? `<span>Level: <span class="badge badge-level">${_esc(ws.level)}</span></span>` : ""}
-        <span>Topic: ${_esc(ws.topic||"—")} ${flagBadge}</span>
+        <span>Topic: ${_esc(ws.topic||"—")}</span>
         ${ws.difficulty ? `<span>Difficulty: ${_esc(ws.difficulty)}</span>` : ""}
         ${ws.type       ? `<span>Type: ${_esc(ws.type)}</span>` : ""}
       </div>

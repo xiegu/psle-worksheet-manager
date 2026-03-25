@@ -11,6 +11,7 @@ let _questions = [];       // array of question objects
 let _teacherPreview = false;
 let _dragSrcIdx = null;    // drag-and-drop source index
 let _undoSnapshot = null;  // last undo snapshot of _questions
+let _titleManuallyEdited = false; // true once user has typed in the title field
 
 // ---------------------------------------------------------------------------
 // Entry point
@@ -22,6 +23,7 @@ async function renderBuilder(container, editingId) {
     if (ws) {
       _draft     = { ...ws };
       _questions = ws.questions.map(q => ({ ...q }));
+      _titleManuallyEdited = true; // editing existing — preserve title
     } else {
       _resetDraft();
     }
@@ -64,6 +66,7 @@ async function renderBuilder(container, editingId) {
   `;
 
   _bindAll();
+  _syncAutoTitle(); // populate title on load if bankMeta pre-filled dropdowns
 }
 
 function _resetDraft() {
@@ -72,6 +75,25 @@ function _resetDraft() {
     difficulty: "Standard", type: "Practice", notes: ""
   };
   _questions = [];
+  _titleManuallyEdited = false;
+}
+
+function _buildAutoTitle() {
+  const parts = [];
+  if (_draft.level)      parts.push(_draft.level);
+  if (_draft.strand)     parts.push(_draft.strand);
+  if (_draft.topic)      parts.push(_draft.topic);
+  const suffix = [_draft.difficulty, _draft.type].filter(Boolean).join(" ");
+  if (suffix) parts.push("— " + suffix);
+  return parts.join(" ");
+}
+
+function _syncAutoTitle() {
+  if (_titleManuallyEdited) return;
+  const title = _buildAutoTitle();
+  _draft.title = title;
+  const el = document.getElementById("f-title");
+  if (el) el.value = title;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +111,7 @@ function _htmlMetadata() {
     <div class="form-row">
       <div class="form-group full">
         <label for="f-title">Title</label>
-        <input id="f-title" type="text" placeholder="e.g. P6 Algebra Practice Set 1"
+        <input id="f-title" type="text" placeholder="Auto-filled from selections below — edit freely"
                value="${_esc(_draft.title)}" maxlength="100" />
       </div>
     </div>
@@ -282,10 +304,6 @@ function _htmlPreviewContent() {
     return `<div class="preview-empty">Fill in the details above to see a live preview.</div>`;
   }
 
-  const flag    = _draft.topic ? getFlag(_draft.topic) : null;
-  const flagBadge = flag
-    ? `<span class="badge badge-${flag.flag.replace("_","-")}">${_esc(flag.label)}</span>`
-    : "";
 
   const questionsHtml = _questions.length === 0
     ? `<p style="color:var(--grey-400);font-size:10px;font-style:italic">No questions yet.</p>`
@@ -332,7 +350,6 @@ function _htmlPreviewContent() {
     <div class="preview-ws-meta">
       ${_draft.level ? `<strong>${_draft.level}</strong> &nbsp;` : ""}
       ${_draft.topic ? _esc(_draft.topic) : "<em>No topic selected</em>"}
-      &nbsp;${flagBadge}
       ${_draft.difficulty ? `&nbsp;&bull;&nbsp;${_draft.difficulty}` : ""}
     </div>
     <hr class="preview-divider" />
@@ -421,12 +438,7 @@ function _updateFlagWarning() {
     return;
   }
 
-  const flag = getFlag(topic);
-  if (!flag) { el.innerHTML = ""; return; }
-
-  el.innerHTML = `<div class="flag-warning flag-warning--${flag.flag}">
-    <strong>${_esc(flag.label)}:</strong> ${_esc(topic)}
-  </div>`;
+  el.innerHTML = "";
 }
 
 // ---------------------------------------------------------------------------
@@ -448,34 +460,40 @@ function _bindMetadata() {
 
   on("f-title", "input", e => {
     _draft.title = e.target.value;
+    _titleManuallyEdited = e.target.value.trim() !== "";
     _refreshPreview();
   });
 
   on("f-level", "change", e => {
     _draft.level = e.target.value;
     _repopulateStrands();
+    _syncAutoTitle();
     _refreshPreview();
   });
 
   on("f-strand", "change", e => {
     _draft.strand = e.target.value;
     _repopulateTopics();
+    _syncAutoTitle();
     _refreshPreview();
   });
 
   on("f-topic", "change", e => {
     _draft.topic = e.target.value;
     _updateFlagWarning();
+    _syncAutoTitle();
     _refreshPreview();
   });
 
   on("f-difficulty", "change", e => {
     _draft.difficulty = e.target.value;
+    _syncAutoTitle();
     _refreshPreview();
   });
 
   on("f-type", "change", e => {
     _draft.type = e.target.value;
+    _syncAutoTitle();
     _refreshPreview();
   });
 
