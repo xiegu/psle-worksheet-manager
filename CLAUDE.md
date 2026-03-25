@@ -10,7 +10,8 @@ PSLE 2026 Math Worksheet Manager — a browser-based, offline-capable SPA for a 
 
 - **Vanilla HTML + CSS + JS only** — no React, Vue, or any framework
 - **No external CDNs** — must work fully offline (no CDN links in HTML)
-- **No backend, no fetch, no API calls** — `localStorage` is the only data store
+- **Node/Express backend** — lightweight REST API serves static files and persists data to JSON files on disk
+- **Dual-write storage** — API (disk) is source of truth; IndexedDB is fast read cache; syncs on boot
 - **No bundler** — files are imported directly via `<script src="...">` tags
 - **A4 print output** — all print CSS must target 210mm x 297mm (Chrome/Edge)
 
@@ -18,23 +19,34 @@ PSLE 2026 Math Worksheet Manager — a browser-based, offline-capable SPA for a 
 
 ```
 psle-worksheet-manager/
+├── server.js               # Express server — static files + REST API
+├── package.json            # Node dependencies (express)
 ├── index.html              # SPA shell + navigation
 ├── style.css               # Global styles + @media print stylesheet
 ├── app.js                  # Router + global state management
 ├── data/
-│   └── syllabus.js         # SOLE source of truth for topic taxonomy & 2026 flags
+│   ├── syllabus.js         # SOLE source of truth for topic taxonomy & 2026 flags
+│   ├── worksheets.json     # Persisted worksheets (source of truth)
+│   ├── papers.json         # Persisted imported papers (source of truth)
+│   └── students.json       # Persisted students with scores & takenQuestions
 ├── modules/
 │   ├── library.js          # Worksheet library dashboard (filters + card grid)
 │   ├── builder.js          # Worksheet creator/editor (3-step form)
 │   ├── preview.js          # Live preview + print handler
-│   └── storage.js          # localStorage CRUD helpers
+│   └── storage.js          # Dual-write storage: REST API (disk) + IndexedDB (cache)
 └── templates/
     └── worksheet.html      # Static A4-printable worksheet template
 ```
 
 ## Running the App
 
-Open `index.html` directly in Chrome or Edge — no build step, no server needed.
+```bash
+cd psle-worksheet-manager
+npm install     # first time only
+npm start       # starts Express server on http://localhost:3001
+```
+
+Open `http://localhost:3001` in Chrome or Edge.
 
 To test print output: open `templates/worksheet.html` in Chrome → Ctrl+P → verify A4 layout with 15mm margins.
 
@@ -44,7 +56,7 @@ To test print output: open `templates/worksheet.html` in Chrome → Ctrl+P → v
 
 `syllabus.js` exports `SYLLABUS` and `TOPIC_FLAGS` as globals. All other modules read from these — **never hardcode topic names or flags elsewhere**.
 
-`storage.js` wraps `localStorage` with typed CRUD functions. All modules that persist data must go through `storage.js`, never call `localStorage` directly.
+`storage.js` provides dual-write storage: writes go to the REST API (JSON files on disk, source of truth) and IndexedDB (fast read cache). On boot, IDB syncs from server. All modules that persist data must go through `storage.js`.
 
 `app.js` owns the router and global state. Modules register themselves and receive state updates via the router.
 
@@ -122,7 +134,7 @@ getFlag(topic)              // returns flag object {flag, label} or null
 - All P1–P6 topics match the MOE 2021 syllabus exactly as defined in `syllabus.js`
 - "Speed" never appears in any dropdown, filter, or saved worksheet
 - 2026 flag badges (New, Moved up, Moved down) appear in builder and library cards
-- Worksheets persist across browser refresh via `localStorage`
+- Worksheets persist on disk via JSON files (survive browser cache clears and browser switches)
 - Student print: no answers visible, clean A4
 - Teacher print: answer key visible with watermark
 - Export JSON → clear storage → import → all worksheets restored

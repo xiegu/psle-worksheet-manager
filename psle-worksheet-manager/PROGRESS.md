@@ -2,7 +2,7 @@
 
 ## What We Built
 
-A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-powered paper scraper.
+A browser-based PSLE 2026 Math Worksheet Manager plus an AI-powered paper scraper. Runs on a local Node/Express server with disk-persisted JSON data.
 
 ---
 
@@ -15,7 +15,11 @@ A fully offline, browser-based PSLE 2026 Math Worksheet Manager plus an AI-power
 | `app.js` | Done | Router — Library / Builder / Preview / Question Bank / Students views |
 | `data/syllabus.js` | Done | Full P1–P6 MOE 2021 taxonomy, 2026 flags, helper functions |
 | `modules/utils.js` | Done | Shared `_esc()` HTML-escape helper (loaded first, used by all modules) |
-| `modules/storage.js` | Done | IndexedDB CRUD (auto-migrates localStorage on first load), export/import JSON backup (v2: includes student data) |
+| `modules/storage.js` | Done | Dual-write storage: REST API (disk, source of truth) + IndexedDB (read cache); syncs from server on boot; auto-migrates IDB→server on first run; export/import JSON backup |
+| `server.js` | Done | Lightweight Express server (~80 lines); serves static files + REST API for `worksheets.json`, `papers.json`, `students.json` |
+| `data/worksheets.json` | Done | Built worksheets persisted on disk |
+| `data/papers.json` | Done | Imported/scraped papers persisted on disk |
+| `data/students.json` | Done | Students with scores and takenQuestions persisted on disk |
 | `modules/library.js` | Done | 4-tab library; title search + independent filters per active tab; Built badge (papers), Taken badge (worksheets); bulk select with Archive/Delete/Restore/Assign Topic; Recover + Delete on archived items |
 | `modules/builder.js` | Done | 3-step worksheet creator; drag-to-reorder + ↑↓ move buttons; Undo for destructive ops; "Pick from QB" modal; saves `sourceKey`; subject-aware live preview title |
 | `modules/preview.js` | Done | Full A4 in-app preview + print window; student/teacher toggle; subject-aware title (`ws.subject`); renders `diagramImage`; logo in header |
@@ -99,10 +103,20 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 ---
 
-## Builder UX Improvements (2026-03-25)
+## Changes (2026-03-25)
 
-- **Auto-generated worksheet title** — title input in Step 1 now auto-fills from Level + Strand + Topic + Difficulty + Type dropdowns (e.g. `P6 Number — Fractions — Standard Practice`). User can freely edit the auto-title; once edited it stays; clearing the field re-enables auto-gen. Editing an existing worksheet preserves its title.
-- **Removed 2026 syllabus flag badges from builder, preview, and print** — "Moved to P6: Average" / "New: Ratio" labels no longer appear in the worksheet builder live preview, in-app preview panel, or printed output. The Speed blocked-topic warning is retained.
+### Node/Express backend — disk-based persistence
+- **`server.js`** — lightweight Express server (~80 lines) serving static files + REST API for 3 JSON collections
+- **`data/worksheets.json`** — user-built worksheets persisted on disk
+- **`data/papers.json`** — imported papers persisted on disk (separated from worksheets)
+- **`data/students.json`** — student records with scores and takenQuestions persisted on disk
+- **Dual-write `storage.js`** — every write goes to API (disk, source of truth) then IndexedDB (cache); reads from IDB; syncs from server on boot
+- **Auto-migration** — on first boot, if server is empty but IDB has data, pushes IDB data to server automatically
+- **Data survives** browser cache clears, browser switches, Chrome reinstalls
+
+### Builder UX
+- **Auto-generated worksheet title** — title input auto-fills from Level + Strand + Topic + Difficulty + Type dropdowns (e.g. `P6 Number — Fractions — Standard Practice`). User can freely edit; clearing the field re-enables auto-gen. Editing existing worksheets preserves title.
+- **Removed 2026 syllabus flag badges from builder, preview, and print** — "Moved to P6: Average" / "New: Ratio" labels removed. Speed blocked-topic warning retained.
 
 ---
 
@@ -151,4 +165,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-25 — 3 open issues remain; builder UX improvements this session*
+*Last updated: 2026-03-25 — Node backend + disk persistence confirmed working; Emily and Aarron test students verified in students.json*

@@ -1,5 +1,5 @@
 // modules/storage.js
-// IndexedDB storage layer for worksheet and student persistence.
+// Dual-write storage layer: REST API (disk, source of truth) + IndexedDB (fast read cache).
 // All modules must go through these functions — never access IDB or localStorage directly.
 //
 // Async functions: getAllWorksheets, getWorksheet, saveWorksheet, deleteWorksheet,
@@ -16,13 +16,31 @@ const WS_STORE   = "worksheets";
 const STU_STORE  = "students";
 
 const ACTIVE_STUDENT_KEY = "psle_active_student";
-
-// Legacy localStorage keys — used only for one-time migration
-const LS_WS_KEY  = "psle_worksheets";
-const LS_STU_KEY = "psle_students";
+const API_BASE = "/api";
 
 let _db = null;
 let _cachedActiveStudent = null;   // kept in sync with every saveStudent / deleteStudent call
+
+// ---------------------------------------------------------------------------
+// API helpers
+// ---------------------------------------------------------------------------
+
+async function _api(path, options = {}) {
+  const res = await fetch(API_BASE + path, {
+    headers: { "Content-Type": "application/json" },
+    ...options
+  });
+  if (!res.ok) throw new Error(`API ${res.status}: ${await res.text()}`);
+  return res.json();
+}
+
+function _apiGet(path)          { return _api(path); }
+function _apiPut(path, body)    { return _api(path, { method: "PUT",    body: JSON.stringify(body) }); }
+function _apiPost(path, body)   { return _api(path, { method: "POST",   body: JSON.stringify(body) }); }
+function _apiDelete(path)       { return _api(path, { method: "DELETE" }); }
+
+/** Determine the API collection for a worksheet/paper based on origin field */
+function _wsApiPath(ws)  { return ws.origin === "imported" ? "/papers" : "/worksheets"; }
 
 // ---------------------------------------------------------------------------
 // DB init — call once at app boot, before any other storage call
@@ -48,70 +66,81 @@ function _openDB() {
 }
 
 /**
- * Open IndexedDB, migrate any existing localStorage data, and prime the
- * active-student cache. Must be awaited before any other storage call.
+ * Sync IDB cache from server. Fetches all three collections and bulk-writes
+ * them into IDB, replacing whatever is there.
+ */
+async function _syncFromServer() {
+  const [worksheets, papers, students] = await Promise.all([
+    _apiGet("/worksheets"),
+    _apiGet("/papers"),
+    _apiGet("/students")
+  ]);
+
+  // Papers and worksheets share the IDB worksheets store (UI filters by origin)
+  const allWs = [...worksheets, ...papers];
+  const wsTx = _db.transaction(WS_STORE, "readwrite");
+  const wsSt = wsTx.objectStore(WS_STORE);
+  wsSt.clear();
+  for (const ws of allWs) { if (ws.id) wsSt.put(ws); }
+  await _txDone(wsTx);
+
+  const stuTx = _db.transaction(STU_STORE, "readwrite");
+  const stuSt = stuTx.objectStore(STU_STORE);
+  stuSt.clear();
+  for (const s of students) { if (s.id) stuSt.put(s); }
+  await _txDone(stuTx);
+
+  console.log(`[storage] Synced from server: ${worksheets.length} worksheets, ${papers.length} papers, ${students.length} students`);
+}
+
+/**
+ * One-time migration: if server JSON files are empty but IDB has data,
+ * push IDB data to the server so existing users don't lose data.
+ */
+async function _migrateIDBToServer() {
+  const [serverWs, serverPapers, serverStu] = await Promise.all([
+    _apiGet("/worksheets"),
+    _apiGet("/papers"),
+    _apiGet("/students")
+  ]);
+
+  // Only migrate if server has no data
+  if (serverWs.length > 0 || serverPapers.length > 0 || serverStu.length > 0) return;
+
+  const idbWs  = await _storeGetAll(WS_STORE);
+  const idbStu = await _storeGetAll(STU_STORE);
+  if (idbWs.length === 0 && idbStu.length === 0) return;
+
+  console.log("[storage] Server empty, IDB has data — migrating to server...");
+
+  const papers     = idbWs.filter(w => w.origin === "imported");
+  const worksheets = idbWs.filter(w => w.origin !== "imported");
+
+  const ops = [];
+  if (worksheets.length > 0) ops.push(_apiPost("/worksheets/bulk", worksheets));
+  if (papers.length > 0)     ops.push(_apiPost("/papers/bulk", papers));
+  if (idbStu.length > 0)     ops.push(_apiPost("/students/bulk", idbStu));
+  await Promise.all(ops);
+
+  console.log(`[storage] Migrated to server: ${worksheets.length} worksheets, ${papers.length} papers, ${idbStu.length} students`);
+}
+
+/**
+ * Open IndexedDB, migrate IDB→server if needed, sync from server, and prime
+ * the active-student cache. Must be awaited before any other storage call.
  */
 async function initDB() {
   _db = await _openDB();
-  await _migrateFromLocalStorage();
-  await _migrateOrigin();
-  const activeId = localStorage.getItem(ACTIVE_STUDENT_KEY);
-  if (activeId) _cachedActiveStudent = await getStudent(activeId);
-}
-
-// One-time migration: if IDB is empty but localStorage has data, move it over.
-async function _migrateFromLocalStorage() {
-  const existing = await getAllWorksheets();
-  if (existing.length > 0) return;   // IDB already has data — skip
 
   try {
-    const wsRaw  = localStorage.getItem(LS_WS_KEY);
-    const stuRaw = localStorage.getItem(LS_STU_KEY);
-
-    if (wsRaw) {
-      const wsList = JSON.parse(wsRaw);
-      if (Array.isArray(wsList) && wsList.length > 0) {
-        const tx = _db.transaction(WS_STORE, "readwrite");
-        const st = tx.objectStore(WS_STORE);
-        for (const ws of wsList) { if (ws.id) st.put(ws); }
-        await _txDone(tx);
-        console.log(`[storage] Migrated ${wsList.length} worksheets from localStorage → IndexedDB`);
-        localStorage.removeItem(LS_WS_KEY);
-      }
-    }
-
-    if (stuRaw) {
-      const stuList = JSON.parse(stuRaw);
-      if (Array.isArray(stuList) && stuList.length > 0) {
-        const tx = _db.transaction(STU_STORE, "readwrite");
-        const st = tx.objectStore(STU_STORE);
-        for (const s of stuList) { if (s.id) st.put(s); }
-        await _txDone(tx);
-        console.log(`[storage] Migrated ${stuList.length} students from localStorage → IndexedDB`);
-        localStorage.removeItem(LS_STU_KEY);
-      }
-    }
+    await _migrateIDBToServer();
+    await _syncFromServer();
   } catch (e) {
-    console.warn("[storage] localStorage migration failed (non-fatal):", e.message);
+    console.warn("[storage] Server sync failed — using IDB cache:", e.message);
   }
-}
 
-// One-time migration: tag existing worksheets with origin field.
-// Heuristic: any question with diagramImage → "imported" (scraped paper);
-// otherwise → "built" (manually created in builder).
-async function _migrateOrigin() {
-  const all = await getAllWorksheets();
-  const toUpdate = all.filter(ws => !ws.origin);
-  if (toUpdate.length === 0) return;
-
-  const tx = _db.transaction(WS_STORE, "readwrite");
-  const st = tx.objectStore(WS_STORE);
-  for (const ws of toUpdate) {
-    const hasImage = (ws.questions || []).some(q => q.diagramImage);
-    st.put({ ...ws, origin: hasImage ? "imported" : "built" });
-  }
-  await _txDone(tx);
-  console.log(`[storage] Origin migration: tagged ${toUpdate.length} worksheet(s)`);
+  const activeId = localStorage.getItem(ACTIVE_STUDENT_KEY);
+  if (activeId) _cachedActiveStudent = await getStudent(activeId);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +188,7 @@ function _today() {
 }
 
 // ---------------------------------------------------------------------------
-// Worksheet CRUD
+// Worksheet CRUD (dual-write: API + IDB cache)
 // ---------------------------------------------------------------------------
 
 /** @returns {Promise<object[]>} All worksheets sorted by updatedAt descending */
@@ -174,7 +203,7 @@ async function getWorksheet(id) {
 }
 
 /**
- * Create or update a worksheet.
+ * Create or update a worksheet. Writes to API (disk) first, then updates IDB cache.
  * @returns {Promise<object>} The saved worksheet
  */
 async function saveWorksheet(ws) {
@@ -184,6 +213,8 @@ async function saveWorksheet(ws) {
     const existing = await getWorksheet(ws.id);
     if (existing) {
       const updated = { ...existing, ...ws, updatedAt: now, version: (existing.version || 1) + 1 };
+      try { await _apiPut(_wsApiPath(updated) + "/" + updated.id, updated); }
+      catch (e) { console.warn("[storage] API write failed:", e.message); }
       await _storePut(WS_STORE, updated);
       return updated;
     }
@@ -195,10 +226,12 @@ async function saveWorksheet(ws) {
     origin: "built",
     version: 1, status: "active", questions: [], notes: "",
     ...ws,
-    id:        "ws_" + Date.now(),
+    id:        ws.id || ("ws_" + Date.now()),
     createdAt: now,
     updatedAt: now
   };
+  try { await _apiPut(_wsApiPath(created) + "/" + created.id, created); }
+  catch (e) { console.warn("[storage] API write failed:", e.message); }
   await _storePut(WS_STORE, created);
   return created;
 }
@@ -207,6 +240,8 @@ async function saveWorksheet(ws) {
 async function deleteWorksheet(id) {
   const existing = await getWorksheet(id);
   if (!existing) return false;
+  try { await _apiDelete(_wsApiPath(existing) + "/" + id); }
+  catch (e) { console.warn("[storage] API delete failed:", e.message); }
   await _storeDelete(WS_STORE, id);
   return true;
 }
@@ -216,6 +251,8 @@ async function archiveWorksheet(id) {
   const ws = await getWorksheet(id);
   if (!ws) return null;
   const updated = { ...ws, status: "archived", updatedAt: _today() };
+  try { await _apiPut(_wsApiPath(updated) + "/" + updated.id, updated); }
+  catch (e) { console.warn("[storage] API write failed:", e.message); }
   await _storePut(WS_STORE, updated);
   return updated;
 }
@@ -225,6 +262,8 @@ async function unarchiveWorksheet(id) {
   const ws = await getWorksheet(id);
   if (!ws) return null;
   const updated = { ...ws, status: "active", updatedAt: _today() };
+  try { await _apiPut(_wsApiPath(updated) + "/" + updated.id, updated); }
+  catch (e) { console.warn("[storage] API write failed:", e.message); }
   await _storePut(WS_STORE, updated);
   return updated;
 }
@@ -236,10 +275,11 @@ async function unarchiveWorksheet(id) {
 /** Triggers a browser download of all data as a JSON backup file. */
 async function exportAll() {
   try {
+    const allWs = await getAllWorksheets();
     const data = {
       exportedAt: new Date().toISOString(),
       version:    2,
-      worksheets: await getAllWorksheets(),
+      worksheets: allWs,
       students:   await getAllStudents()
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -256,7 +296,6 @@ async function exportAll() {
 
 /**
  * Allow only JPEG/PNG data URIs for diagram images.
- * Rejects javascript: URIs, SVG data URIs, or anything unexpected.
  * @param {*} val
  * @returns {string|null}
  */
@@ -270,6 +309,7 @@ function _sanitizeDiagramImage(val) {
 /**
  * Restore from a JSON backup. Merges by id (imported records overwrite existing
  * ones with the same id; existing records not in the import are kept).
+ * Routes papers to /api/papers and worksheets to /api/worksheets.
  * @param {string} jsonString
  * @returns {Promise<{imported: number, skipped: number}>}
  */
@@ -286,14 +326,13 @@ async function importAll(jsonString) {
     throw new Error("Invalid backup format — expected a worksheets array.");
   }
 
-  const existing    = await getAllWorksheets();
-  const existingMap = new Map(existing.map(w => [w.id, w]));
-
   let imported = 0, skipped = 0;
+  const papers = [], worksheets = [];
+
   for (const ws of incoming) {
-    if (!ws.id || typeof ws.id !== "string")    { skipped++; continue; }
-    if (!ws.title || typeof ws.title !== "string") { skipped++; continue; }
-    // Sanitize diagram images — reject anything that isn't a plain JPEG/PNG data URI
+    if (!ws.id || typeof ws.id !== "string")       { skipped++; continue; }
+    if (!ws.title || typeof ws.title !== "string")  { skipped++; continue; }
+    // Sanitize diagram images
     const questions = (Array.isArray(ws.questions) ? ws.questions : []).map(q => {
       if (!q || typeof q !== "object") return null;
       const clean = { ...q };
@@ -302,41 +341,77 @@ async function importAll(jsonString) {
       else     delete clean.diagramImage;
       return clean;
     }).filter(Boolean);
-    existingMap.set(ws.id, { origin: "imported", ...ws, questions });
+    const record = { origin: "imported", ...ws, questions };
+    if (record.origin === "imported") papers.push(record);
+    else worksheets.push(record);
     imported++;
   }
 
-  const tx = _db.transaction(WS_STORE, "readwrite");
-  const st = tx.objectStore(WS_STORE);
-  for (const ws of existingMap.values()) { st.put(ws); }
-  await _txDone(tx);
+  // Push to server
+  try {
+    const ops = [];
+    if (papers.length > 0)     ops.push(_apiPost("/papers/bulk", papers));
+    if (worksheets.length > 0) ops.push(_apiPost("/worksheets/bulk", worksheets));
+    await Promise.all(ops);
+  } catch (e) { console.warn("[storage] API bulk import failed:", e.message); }
 
-  // Merge student data (v2+ backups)
+  // Import students (v2+ backups)
   if (Array.isArray(parsed.students)) {
-    const existingStudents = await getAllStudents();
-    const studentMap = new Map(existingStudents.map(s => [s.id, s]));
-    for (const stu of parsed.students) {
-      if (!stu.id || !stu.name) continue;
-      studentMap.set(stu.id, stu);
+    const validStudents = parsed.students.filter(s => s.id && s.name);
+    if (validStudents.length > 0) {
+      try { await _apiPost("/students/bulk", validStudents); }
+      catch (e) { console.warn("[storage] API student import failed:", e.message); }
     }
-    const stuTx = _db.transaction(STU_STORE, "readwrite");
-    const stuSt = stuTx.objectStore(STU_STORE);
-    for (const s of studentMap.values()) { stuSt.put(s); }
-    await _txDone(stuTx);
+  }
+
+  // Re-sync IDB from server
+  try { await _syncFromServer(); }
+  catch (e) {
+    // Fallback: write directly to IDB
+    console.warn("[storage] Post-import sync failed, writing to IDB directly:", e.message);
+    const allRecords = [...papers, ...worksheets];
+    const tx = _db.transaction(WS_STORE, "readwrite");
+    const st = tx.objectStore(WS_STORE);
+    for (const ws of allRecords) { st.put(ws); }
+    await _txDone(tx);
+
+    if (Array.isArray(parsed.students)) {
+      const stuTx = _db.transaction(STU_STORE, "readwrite");
+      const stuSt = stuTx.objectStore(STU_STORE);
+      for (const s of parsed.students) { if (s.id && s.name) stuSt.put(s); }
+      await _txDone(stuTx);
+    }
   }
 
   return { imported, skipped };
 }
 
-/** Wipe all worksheets from IDB. Use with caution. */
+/** Wipe all data from both server and IDB. Use with caution. */
 async function clearAll() {
-  const tx = _db.transaction(WS_STORE, "readwrite");
-  tx.objectStore(WS_STORE).clear();
-  await _txDone(tx);
+  // Clear IDB
+  const wsTx = _db.transaction(WS_STORE, "readwrite");
+  wsTx.objectStore(WS_STORE).clear();
+  await _txDone(wsTx);
+
+  const stuTx = _db.transaction(STU_STORE, "readwrite");
+  stuTx.objectStore(STU_STORE).clear();
+  await _txDone(stuTx);
+
+  // Clear server files
+  try {
+    const [wsAll, papersAll, stuAll] = await Promise.all([
+      _apiGet("/worksheets"), _apiGet("/papers"), _apiGet("/students")
+    ]);
+    const ops = [];
+    for (const w of wsAll)     ops.push(_apiDelete("/worksheets/" + w.id));
+    for (const p of papersAll) ops.push(_apiDelete("/papers/" + p.id));
+    for (const s of stuAll)    ops.push(_apiDelete("/students/" + s.id));
+    await Promise.all(ops);
+  } catch (e) { console.warn("[storage] API clear failed:", e.message); }
 }
 
 // ---------------------------------------------------------------------------
-// Student CRUD
+// Student CRUD (dual-write: API + IDB cache)
 // ---------------------------------------------------------------------------
 
 /** @returns {Promise<object[]>} All students sorted by name */
@@ -362,6 +437,8 @@ async function saveStudent(student) {
     const existing = await getStudent(student.id);
     if (existing) {
       const updated = { ...existing, ...student };
+      try { await _apiPut("/students/" + updated.id, updated); }
+      catch (e) { console.warn("[storage] API write failed:", e.message); }
       await _storePut(STU_STORE, updated);
       if (_cachedActiveStudent && _cachedActiveStudent.id === updated.id) {
         _cachedActiveStudent = updated;
@@ -373,9 +450,11 @@ async function saveStudent(student) {
   const created = {
     name: "", takenQuestions: [], scores: [],
     ...student,
-    id:        "stu_" + Date.now(),
+    id:        student.id || ("stu_" + Date.now()),
     createdAt: now
   };
+  try { await _apiPut("/students/" + created.id, created); }
+  catch (e) { console.warn("[storage] API write failed:", e.message); }
   await _storePut(STU_STORE, created);
   return created;
 }
@@ -384,6 +463,8 @@ async function saveStudent(student) {
 async function deleteStudent(id) {
   const existing = await getStudent(id);
   if (!existing) return false;
+  try { await _apiDelete("/students/" + id); }
+  catch (e) { console.warn("[storage] API delete failed:", e.message); }
   await _storeDelete(STU_STORE, id);
   if (_cachedActiveStudent && _cachedActiveStudent.id === id) {
     _cachedActiveStudent = null;
@@ -393,9 +474,6 @@ async function deleteStudent(id) {
 
 // ---------------------------------------------------------------------------
 // Active student
-// Active student ID is stored in localStorage (tiny string, no size concern).
-// The active student object is kept in a memory cache for sync access by
-// HTML generators that cannot be made async.
 // ---------------------------------------------------------------------------
 
 /** @returns {string|null} */
@@ -405,15 +483,12 @@ function getActiveStudentId() {
 
 /**
  * Set (or clear) the active student. Updates localStorage and memory cache.
- * Guards against race conditions: if two calls overlap, only the last caller
- * writes to the cache (checked by re-reading localStorage after the await).
  * @returns {Promise<void>}
  */
 async function setActiveStudentId(id) {
   if (id) {
     localStorage.setItem(ACTIVE_STUDENT_KEY, id);
     const stu = await getStudent(id);
-    // Only update the cache if this call is still the most-recent one
     if (localStorage.getItem(ACTIVE_STUDENT_KEY) === id) {
       _cachedActiveStudent = stu;
     }
@@ -425,8 +500,6 @@ async function setActiveStudentId(id) {
 
 /**
  * Sync — returns the cached active student object (or null).
- * Always reflects the latest saved state because saveStudent keeps the cache
- * in sync and setActiveStudentId refreshes it on change.
  * @returns {object|null}
  */
 function getActiveStudent() {
@@ -458,7 +531,6 @@ async function recordScore(studentId, wsId, score, total, date) {
 
 /**
  * Sync — filters scores from the cached active student.
- * Only call with the active student's id (the cache only holds the active student).
  * @returns {object[]}
  */
 function getScoresForWorksheet(studentId, wsId) {
