@@ -97,9 +97,21 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 - [ ] **Rotate API key** ([#1](https://github.com/xiegu/psle-worksheet-manager/issues/1)) — revoke old key at `platform.claude.com/settings/api-keys` *(manual step)*
 - [ ] **Scrape more papers** ([#3](https://github.com/xiegu/psle-worksheet-manager/issues/3)) — run scraper for other schools, years, levels (P5, P4)
 
+### Reliability
+- [ ] **Server write lock** ([#25](https://github.com/xiegu/psle-worksheet-manager/issues/25)) — add per-collection mutex to prevent concurrent file corruption
+- [ ] **Show API sync failure warning** ([#26](https://github.com/xiegu/psle-worksheet-manager/issues/26)) — toast + sync indicator when server write fails silently
+- [ ] **Double-click guard on card actions** ([#30](https://github.com/xiegu/psle-worksheet-manager/issues/30)) — disable buttons during async operations to prevent duplicate actions
+
+### Bug fixes
+- [ ] **Score date null crash** ([#28](https://github.com/xiegu/psle-worksheet-manager/issues/28)) — null guard on date sort in students module
+
 ### Enhancements
 - [ ] **Batch print** ([#4](https://github.com/xiegu/psle-worksheet-manager/issues/4)) — print multiple worksheets in one browser print session
 - [ ] **Separate answer key sheet** ([#5](https://github.com/xiegu/psle-worksheet-manager/issues/5)) — printable answer key on its own page
+
+### Cleanup
+- [ ] **Flag filter label mismatch** ([#27](https://github.com/xiegu/psle-worksheet-manager/issues/27)) — library filter says "Moved up/down" but syllabus says "Moved to P6"/"Now in P4"
+- [ ] **Stale badge CSS** ([#29](https://github.com/xiegu/psle-worksheet-manager/issues/29)) — removed flag badges still have CSS rules in preview.js and style.css
 
 ---
 
@@ -165,4 +177,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-25 — Node backend + disk persistence confirmed working; Emily and Aarron test students verified in students.json*
+*Last updated: 2026-03-25 — code review completed; 6 new issues filed (#25–#30)*
