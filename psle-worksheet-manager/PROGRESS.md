@@ -106,12 +106,18 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 - [ ] **Score date null crash** ([#28](https://github.com/xiegu/psle-worksheet-manager/issues/28)) — null guard on date sort in students module
 
 ### Enhancements
-- [ ] **Batch print** ([#4](https://github.com/xiegu/psle-worksheet-manager/issues/4)) — print multiple worksheets in one browser print session
-- [ ] **Separate answer key sheet** ([#5](https://github.com/xiegu/psle-worksheet-manager/issues/5)) — printable answer key on its own page
+*(all enhancement issues resolved)*
 
 ### Cleanup
-- [ ] **Flag filter label mismatch** ([#27](https://github.com/xiegu/psle-worksheet-manager/issues/27)) — library filter says "Moved up/down" but syllabus says "Moved to P6"/"Now in P4"
-- [ ] **Stale badge CSS** ([#29](https://github.com/xiegu/psle-worksheet-manager/issues/29)) — removed flag badges still have CSS rules in preview.js and style.css
+*(all cleanup issues resolved)*
+
+---
+
+## Changes (2026-03-29)
+
+### Batch print (#4) + Separate answer key page (#5)
+- **`modules/preview.js`** — refactored `generateWorksheetHTML` to use shared `_buildPageDivs(ws, teacherMode)` helper and extracted `_PRINT_CSS` constant; teacher mode now produces two separate `.page` divs: questions page + answer key page (page break between them); added `openBatchPrintWindow(worksheets)` for single-session multi-worksheet printing (student copy); exposed globally
+- **`modules/library.js`** — added "Print (n)" button to bulk bar for worksheets tab; handler fetches all selected worksheets and calls `openBatchPrintWindow`
 
 ---
 
@@ -136,6 +142,10 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 | Issue | What was done |
 |-------|---------------|
+| [#5](https://github.com/xiegu/psle-worksheet-manager/issues/5) | Teacher mode print: answer key now on its own page (separate `.page` div with page break) |
+| [#4](https://github.com/xiegu/psle-worksheet-manager/issues/4) | Batch print: "Print (n)" in bulk bar opens one print session for all selected worksheets (student copy) |
+| [#29](https://github.com/xiegu/psle-worksheet-manager/issues/29) | Removed stale `.badge-new`, `.badge-moved-up`, `.badge-moved-down` CSS from `preview.js` inline styles |
+| [#27](https://github.com/xiegu/psle-worksheet-manager/issues/27) | Fixed flag filter labels in library: "Moved up" → "Moved to P6", "Moved down" → "Now in P4 / P3" |
 | [#21](https://github.com/xiegu/psle-worksheet-manager/issues/21) | Drag-drop bounds check (NaN + range guard); bulk archive error reporting |
 | [#16](https://github.com/xiegu/psle-worksheet-manager/issues/16) | Accessibility — `aria-current` on nav, `role/aria-label` on nav+icons, Escape closes all modals, Enter submits score + student-add inputs |
 | [#15](https://github.com/xiegu/psle-worksheet-manager/issues/15) | Print improvements — logo fallback placeholder, `overflow-wrap` on q-text, `orphans/widows:2`, `break-inside:avoid`, diagram capped to 80mm in print |
@@ -177,4 +187,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-25 — code review completed; 6 new issues filed (#25–#30)*
+*Last updated: 2026-03-29 — closed #4 (batch print), #5 (separate answer key page)*

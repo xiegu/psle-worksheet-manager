@@ -149,8 +149,8 @@ function _htmlFilterBar(prefix, filters) {
   const types        = ["Practice","Word Problem","Mixed","Exam-style"];
   const flagOpts     = [
     { value:"new",        label:"New 2026"   },
-    { value:"moved_up",   label:"Moved up"   },
-    { value:"moved_down", label:"Moved down" }
+    { value:"moved_up",   label:"Moved to P6"    },
+    { value:"moved_down", label:"Now in P4 / P3" }
   ];
   const p = `fil-${prefix}`;
 
@@ -414,7 +414,8 @@ function _htmlBulkBar(type, isArchived) {
     actions = `
       <button class="btn btn-sm btn-danger" id="btn-bulk-archive">Archive (${n})</button>
       <button class="btn btn-sm btn-danger" id="btn-bulk-delete-sel">Delete (${n})</button>
-      ${type === "worksheet" ? `<button class="btn btn-sm" id="btn-bulk-assign-topic">Assign Topic</button>` : ""}`;
+      ${type === "worksheet" ? `<button class="btn btn-sm" id="btn-bulk-assign-topic">Assign Topic</button>` : ""}
+      ${type === "worksheet" ? `<button class="btn btn-sm btn-primary" id="btn-bulk-print">Print (${n})</button>` : ""}`;
   }
   return `
     <div class="lib-bulk-bar">
@@ -469,6 +470,13 @@ function _bindBulkBar(type, isArchived) {
   });
 
   document.getElementById("btn-bulk-assign-topic")?.addEventListener("click", _showAssignTopicModal);
+
+  document.getElementById("btn-bulk-print")?.addEventListener("click", async () => {
+    const ids = [..._selectedCards];
+    const worksheets = (await Promise.all(ids.map(id => getWorksheet(id)))).filter(Boolean);
+    if (!worksheets.length) return;
+    openBatchPrintWindow(worksheets);
+  });
 }
 
 function _showAssignTopicModal() {

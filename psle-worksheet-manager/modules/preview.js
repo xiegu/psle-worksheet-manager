@@ -205,85 +205,14 @@ function _bindPreview() {
 // Shared print-window utility (globally available)
 // ---------------------------------------------------------------------------
 
-/**
- * Generates a self-contained A4 HTML document string for a worksheet.
- * Shared by preview.js, and available globally for builder/library to adopt.
- * @param {object}  ws           - Worksheet object from storage
- * @param {boolean} teacherMode  - true = show answers + answer key
- * @returns {string} Full HTML document
- */
-function generateWorksheetHTML(ws, teacherMode) {
-  const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
+// ---------------------------------------------------------------------------
+// Shared print CSS (used by single-print and batch-print)
+// ---------------------------------------------------------------------------
 
-  const questionsHtml = (ws.questions||[]).map((q, i) => {
-    let body = "";
-    if (q.type === "mcq") {
-      body = `<div class="mcq-options">
-        ${(q.options||[]).map((o,oi) => `
-          <div class="mcq-option">
-            <div class="mcq-circle"></div>
-            (${String.fromCharCode(65+oi)}) &nbsp; ${_esc(_stripOptionPrefix(o))}
-          </div>`).join("")}
-      </div>`;
-    } else {
-      const lines = q.type === "long_answer" ? 6 : 3;
-      body = `<div class="working-space">
-        ${Array(lines).fill('<div class="working-line"></div>').join("")}
-      </div>
-      <div class="answer-box">
-        <span class="ans-label">Answer:</span>
-        <div class="ans-blank"></div>
-      </div>`;
-    }
-    const ansRow  = teacherMode && q.answer  ? `<div class="answer-key-inline">Ans: ${_esc(q.answer)}</div>`   : "";
-    const wrkRow  = teacherMode && q.working ? `<div class="working-key-inline">${_esc(q.working)}</div>`       : "";
-
-    const diagramHtml = q.diagramImage
-      ? `<img class="diagram-img" src="${q.diagramImage}" alt="Diagram for Q${i+1}" />`
-      : "";
-
-    return `
-      <div class="question">
-        <div class="question-stem">
-          <span class="q-number">Q${i+1}.</span>
-          <span class="q-text">${_esc(q.text)}</span>
-          <span class="q-marks">[${q.marks||1}m]</span>
-        </div>
-        ${diagramHtml}${body}${ansRow}${wrkRow}
-      </div>`;
-  }).join("");
-
-  const answerKeyHtml = teacherMode ? (() => {
-    const rows = (ws.questions||[]).map((q,i) => `
-      <tr>
-        <td>Q${i+1}</td>
-        <td>${_esc(q.answer||"—")}</td>
-        <td class="wt">${_esc(q.working||"")}</td>
-        <td>${q.marks||1}</td>
-      </tr>`).join("");
-    return `
-      <div style="margin-top:24px;border-top:2px dashed #c0392b;padding-top:12px">
-        <h2 style="font-size:13pt;color:#c0392b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">Answer Key</h2>
-        <table style="width:100%;border-collapse:collapse;font-size:11pt">
-          <thead><tr style="background:#f2dede">
-            <th style="border:1px solid #ccc;padding:5px 10px">Q</th>
-            <th style="border:1px solid #ccc;padding:5px 10px">Answer</th>
-            <th style="border:1px solid #ccc;padding:5px 10px">Working</th>
-            <th style="border:1px solid #ccc;padding:5px 10px">Marks</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>`;
-  })() : "";
-
-  return `<!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="UTF-8"/>
-<title>${_esc(ws.title)}</title>
-<style>
+const _PRINT_CSS = `
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   body{font-family:"Times New Roman",Times,serif;font-size:13pt;color:#000;background:#e8e8e8;padding:24px}
-  .page{width:210mm;min-height:297mm;background:#fff;margin:0 auto;padding:15mm;position:relative;box-shadow:0 2px 12px rgba(0,0,0,.18)}
+  .page{width:210mm;min-height:297mm;background:#fff;margin:0 auto 32px;padding:15mm;position:relative;box-shadow:0 2px 12px rgba(0,0,0,.18)}
   .ws-header{display:flex;align-items:center;gap:14px;border-bottom:2.5px solid #000;padding-bottom:8px;margin-bottom:10px}
   .ws-logo{width:100px;height:100px;border-radius:4px;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
   .ws-logo img{width:100%;height:100%;object-fit:contain}
@@ -293,10 +222,7 @@ function generateWorksheetHTML(ws, teacherMode) {
   .ws-meta{font-size:10pt;color:#333;margin-top:3px;display:flex;gap:18px;flex-wrap:wrap}
   .badge{display:inline-block;padding:1px 7px;border-radius:3px;font-size:8.5pt;font-weight:bold;vertical-align:middle;margin-left:4px}
   .badge-level{background:#1a56a0;color:#fff}
-  .badge-new{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
-  .badge-moved-up{background:#cce5ff;color:#004085;border:1px solid #b8daff}
-  .badge-moved-down{background:#fff3cd;color:#856404;border:1px solid #ffeeba}
-  .teacher-watermark{display:${teacherMode?"block":"none"};position:absolute;top:18mm;right:15mm;font-size:11pt;font-weight:bold;color:#c0392b;letter-spacing:.08em;border:2px solid #c0392b;padding:2px 8px;transform:rotate(-15deg);opacity:.7}
+  .teacher-watermark{display:block;position:absolute;top:18mm;right:15mm;font-size:11pt;font-weight:bold;color:#c0392b;letter-spacing:.08em;border:2px solid #c0392b;padding:2px 8px;transform:rotate(-15deg);opacity:.7}
   .ws-info-row{display:flex;border:1.5px solid #000;margin-bottom:14px}
   .ws-info-row .info-cell{flex:1;padding:10px 8px;border-right:1px solid #000;font-size:11pt}
   .ws-info-row .info-cell:last-child{border-right:none}
@@ -323,6 +249,9 @@ function generateWorksheetHTML(ws, teacherMode) {
   td,th{border:1px solid #ccc;padding:5px 10px;text-align:left}
   .ws-footer{border-top:2px solid #000;margin-top:20px;padding-top:8px;display:flex;justify-content:space-between;align-items:center;font-size:11pt}
   .marks-box{border:1.5px solid #000;padding:4px 14px;font-size:12pt;font-weight:bold}
+  .ak-title{font-size:13pt;color:#c0392b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;border-bottom:2px dashed #c0392b;padding-bottom:8px}
+  .ak-table{width:100%;border-collapse:collapse;font-size:11pt}
+  .ak-table thead tr{background:#f2dede}
   @media print{
     body{background:none;padding:0;orphans:2;widows:2}
     .page{width:210mm;min-height:297mm;margin:0;padding:15mm;box-shadow:none;page-break-after:always}
@@ -332,12 +261,66 @@ function generateWorksheetHTML(ws, teacherMode) {
     .ws-logo__placeholder{display:none}
     @page{size:A4 portrait;margin:0}
   }
-</style>
-</head><body>
+`;
+
+// ---------------------------------------------------------------------------
+// Page div builder — shared by single-print and batch-print
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the .page div(s) HTML for one worksheet.
+ * Teacher mode produces two pages: questions page + a separate answer key page.
+ * @param {object}  ws          - Worksheet object
+ * @param {boolean} teacherMode - true = show answers inline + separate answer key page
+ * @returns {string} One or two .page div HTML strings
+ */
+function _buildPageDivs(ws, teacherMode) {
+  const totalMarks = (ws.questions||[]).reduce((s,q) => s+(parseInt(q.marks)||0), 0);
+  const logoHtml = window.LOGO_DATA_URL
+    ? `<img src="${window.LOGO_DATA_URL}" alt="Logo" />`
+    : `<div class="ws-logo__placeholder">WM</div>`;
+
+  const questionsHtml = (ws.questions||[]).map((q, i) => {
+    let body = "";
+    if (q.type === "mcq") {
+      body = `<div class="mcq-options">
+        ${(q.options||[]).map((o,oi) => `
+          <div class="mcq-option">
+            <div class="mcq-circle"></div>
+            (${String.fromCharCode(65+oi)}) &nbsp; ${_esc(_stripOptionPrefix(o))}
+          </div>`).join("")}
+      </div>`;
+    } else {
+      const lines = q.type === "long_answer" ? 6 : 3;
+      body = `<div class="working-space">
+        ${Array(lines).fill('<div class="working-line"></div>').join("")}
+      </div>
+      <div class="answer-box">
+        <span class="ans-label">Answer:</span>
+        <div class="ans-blank"></div>
+      </div>`;
+    }
+    const ansRow = teacherMode && q.answer  ? `<div class="answer-key-inline">Ans: ${_esc(q.answer)}</div>`  : "";
+    const wrkRow = teacherMode && q.working ? `<div class="working-key-inline">${_esc(q.working)}</div>`      : "";
+    const diagramHtml = q.diagramImage
+      ? `<img class="diagram-img" src="${q.diagramImage}" alt="Diagram for Q${i+1}" />`
+      : "";
+    return `
+      <div class="question">
+        <div class="question-stem">
+          <span class="q-number">Q${i+1}.</span>
+          <span class="q-text">${_esc(q.text)}</span>
+          <span class="q-marks">[${q.marks||1}m]</span>
+        </div>
+        ${diagramHtml}${body}${ansRow}${wrkRow}
+      </div>`;
+  }).join("");
+
+  const mainPage = `
 <div class="page">
-  <div class="teacher-watermark">ANSWER KEY</div>
+  ${teacherMode ? '<div class="teacher-watermark">ANSWER KEY</div>' : ""}
   <div class="ws-header">
-    <div class="ws-logo">${window.LOGO_DATA_URL ? `<img src="${window.LOGO_DATA_URL}" alt="Logo" />` : `<div class="ws-logo__placeholder">WM</div>`}</div>
+    <div class="ws-logo">${logoHtml}</div>
     <div class="ws-title-block">
       <h1>${_esc((ws.subject||"Maths")+" Worksheet")}</h1>
       <div class="ws-meta">
@@ -362,10 +345,77 @@ function generateWorksheetHTML(ws, teacherMode) {
     <span>${_esc(ws.title)}</span>
     <div class="marks-box">Total: &nbsp;&nbsp;&nbsp;&nbsp; / ${totalMarks} marks</div>
   </div>
-  ${answerKeyHtml}
-</div>
+</div>`;
+
+  if (!teacherMode) return mainPage;
+
+  // Answer key on its own page (#5)
+  const akRows = (ws.questions||[]).map((q,i) => `
+    <tr>
+      <td>Q${i+1}</td>
+      <td>${_esc(q.answer||"—")}</td>
+      <td class="wt">${_esc(q.working||"")}</td>
+      <td>${q.marks||1}</td>
+    </tr>`).join("");
+
+  const answerKeyPage = `
+<div class="page">
+  <div class="teacher-watermark">ANSWER KEY</div>
+  <h2 class="ak-title">Answer Key — ${_esc(ws.title)}</h2>
+  <table class="ak-table">
+    <thead><tr><th>Q</th><th>Answer</th><th>Working</th><th>Marks</th></tr></thead>
+    <tbody>${akRows}</tbody>
+  </table>
+</div>`;
+
+  return mainPage + answerKeyPage;
+}
+
+// ---------------------------------------------------------------------------
+// Shared print-window utilities (globally available)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a self-contained A4 HTML document string for a worksheet.
+ * Teacher mode produces a questions page + a separate answer key page (#5).
+ * @param {object}  ws           - Worksheet object from storage
+ * @param {boolean} teacherMode  - true = show answers + separate answer key page
+ * @returns {string} Full HTML document
+ */
+function generateWorksheetHTML(ws, teacherMode) {
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"/>
+<title>${_esc(ws.title)}</title>
+<style>${_PRINT_CSS}</style>
+</head><body>
+${_buildPageDivs(ws, teacherMode)}
 <script>window.onload=function(){window.print();}<\/script>
 </body></html>`;
+}
+
+/**
+ * Opens a single print window for multiple worksheets (student copy, #4).
+ * All worksheets are printed in one browser print session with page breaks between them.
+ * @param {object[]} worksheets - Array of worksheet objects
+ */
+function openBatchPrintWindow(worksheets) {
+  const win = window.open("", "_blank");
+  if (!win) {
+    showToast("Pop-up blocked — please allow pop-ups for this page.", "error");
+    return;
+  }
+  const pagesHtml = worksheets.map(ws => _buildPageDivs(ws, false)).join("\n");
+  win.document.write(`<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"/>
+<title>Batch Print (${worksheets.length} worksheet${worksheets.length !== 1 ? "s" : ""})</title>
+<style>${_PRINT_CSS}</style>
+</head><body>
+${pagesHtml}
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`);
+  win.document.close();
 }
 
 /**
@@ -385,8 +435,9 @@ function openPrintWindow(ws, teacherMode) {
 }
 
 // Expose globally
-window.generateWorksheetHTML = generateWorksheetHTML;
-window.openPrintWindow       = openPrintWindow;
+window.generateWorksheetHTML  = generateWorksheetHTML;
+window.openPrintWindow        = openPrintWindow;
+window.openBatchPrintWindow   = openBatchPrintWindow;
 
 // ---------------------------------------------------------------------------
 // In-app preview styles (injected once)
