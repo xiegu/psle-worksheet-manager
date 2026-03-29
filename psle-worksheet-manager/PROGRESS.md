@@ -113,6 +113,13 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 ## Changes (2026-03-29)
 
+### Performance & cleanup (#31–#35)
+- **`modules/storage.js`** — non-blocking boot sync (#31): if IDB already has data, app loads from cache immediately and syncs from server in background; first boot still blocks
+- **`modules/utils.js`** — added `_debounce(fn, ms)` utility (#32)
+- **`modules/library.js`** — debounced search input by 250ms (#32); targeted card removal for archive/delete/restore instead of full re-render (#33); added `_removeCardAndUpdateCounts()` and `_refreshCounts()` helpers
+- **`modules/questionbank.js`** — debounced search input by 250ms (#32); cached filtered question list to skip re-filtering on page turns (#34)
+- **`style.css`** — removed 4 dead CSS selectors: `.flag-warning--new/moved_up/moved_down`, `.filter-group--toggle` (#35)
+
 ### Server write lock (#25), sync warnings (#26), null date fix (#28), double-click guard (#30)
 - **`server.js`** — added per-collection promise-chain mutex (`withLock`); PUT, DELETE, and bulk POST routes now serialise writes per collection, preventing concurrent file corruption
 - **`modules/storage.js`** — replaced 11 silent `console.warn` calls with `_syncWarn()` helper that shows an error toast + logs to console; added null guard on date sort in `getScoresForWorksheet()`
@@ -146,6 +153,11 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 | Issue | What was done |
 |-------|---------------|
+| [#35](https://github.com/xiegu/psle-worksheet-manager/issues/35) | Removed 4 dead CSS selectors (flag-warning variants, filter-group--toggle) |
+| [#34](https://github.com/xiegu/psle-worksheet-manager/issues/34) | QB filtered-question cache — skip re-filtering on page turns |
+| [#33](https://github.com/xiegu/psle-worksheet-manager/issues/33) | Targeted card removal + count update instead of full library re-render |
+| [#32](https://github.com/xiegu/psle-worksheet-manager/issues/32) | 250ms debounce on library + QB search inputs |
+| [#31](https://github.com/xiegu/psle-worksheet-manager/issues/31) | Non-blocking boot sync — IDB cache used immediately, server sync in background |
 | [#30](https://github.com/xiegu/psle-worksheet-manager/issues/30) | Double-click guard: card action buttons disabled during async, re-enabled on completion |
 | [#28](https://github.com/xiegu/psle-worksheet-manager/issues/28) | Null guard on date sort in `getScoresForWorksheet()` and students score history |
 | [#26](https://github.com/xiegu/psle-worksheet-manager/issues/26) | `_syncWarn()` replaces 11 silent `console.warn` calls with error toast + console log |
@@ -195,4 +207,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-29 — closed #25 (write lock), #26 (sync warnings), #28 (null date), #30 (double-click guard)*
+*Last updated: 2026-03-29 — closed #31–#35 (performance + cleanup)*

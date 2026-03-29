@@ -22,3 +22,15 @@ function _esc(str) {
 function _stripOptionPrefix(str) {
   return String(str ?? "").replace(/^\(?[A-Da-d][.)]\)?\s*/, "");
 }
+
+/**
+ * Returns a debounced version of `fn` that delays invocation until
+ * `ms` milliseconds have elapsed since the last call.
+ */
+function _debounce(fn, ms) {
+  let timer;
+  return function(...args) {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), ms);
+  };
+}

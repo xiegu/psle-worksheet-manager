@@ -521,9 +521,6 @@ button { cursor: pointer; font-family: inherit; }
   margin-top: 6px;
 }
 
-.flag-warning--new        { background: var(--green-light); color: var(--green); }
-.flag-warning--moved_up   { background: var(--blue-light);  color: var(--blue); }
-.flag-warning--moved_down { background: var(--amber-light); color: var(--amber); }
 .flag-warning--blocked    { background: var(--red-light);   color: var(--red); font-weight: 600; }
 
 /* -------------------------------------------------------------------------
@@ -1060,17 +1057,6 @@ button { cursor: pointer; font-family: inherit; }
   border: 1px solid var(--border);
 }
 
-/* Hide-taken checkbox filter group */
-.filter-group--toggle {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-  min-width: auto;
-}
-
-.filter-group--toggle label {
-  margin-bottom: 0;
-}
 
 .filter-group--toggle input[type="checkbox"] {
   width: 15px;

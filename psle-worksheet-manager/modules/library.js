@@ -713,10 +713,10 @@ function _bindFilterBar(prefix) {
   const filters = prefix === "ws" ? _wsFilters : _paperFilters;
   const p = `fil-${prefix}`;
 
-  document.getElementById(`${p}-search`)?.addEventListener("input", e => {
+  document.getElementById(`${p}-search`)?.addEventListener("input", _debounce(e => {
     filters.search = e.target.value;
     _renderTabGrid(_activeTab);
-  });
+  }, 250));
   document.getElementById(`${p}-level`)?.addEventListener("change", e => {
     filters.level = e.target.value; filters.strand = ""; filters.topic = "";
     _rebuildFilterBar(prefix);
@@ -795,6 +795,35 @@ function _onCardClick(e) {
 // Card actions
 // ---------------------------------------------------------------------------
 
+/** Remove a card from the DOM and update tab counts without full re-render. */
+function _removeCardAndUpdateCounts(id) {
+  const card = document.querySelector(`.ws-card[data-id="${id}"]`);
+  if (card) card.remove();
+  _selectedCards.delete(id);
+  // Update the counts in tabs and stats bar
+  _refreshCounts();
+}
+
+async function _refreshCounts() {
+  const all = await getAllWorksheets();
+  const counts = _getCounts(all);
+  // Update tab labels
+  const tabMap = { worksheets: counts.ws, papers: counts.papers, "archived-ws": counts.archWs, "archived-papers": counts.archPp };
+  document.querySelectorAll(".lib-tab[data-tab]").forEach(btn => {
+    const count = tabMap[btn.dataset.tab];
+    const span = btn.querySelector(".lib-count");
+    if (span && count !== undefined) span.textContent = `(${count})`;
+  });
+  // Update stats bar
+  const vals = document.querySelectorAll(".stat-card__value");
+  if (vals.length >= 4) {
+    vals[0].textContent = counts.ws;
+    vals[1].textContent = counts.papers;
+    vals[2].textContent = counts.archWs;
+    vals[3].textContent = counts.archPp;
+  }
+}
+
 async function _handleDuplicate(id) {
   const ws = await getWorksheet(id);
   if (!ws) return;
@@ -807,7 +836,7 @@ async function _handleDuplicate(id) {
   try {
     await saveWorksheet(copy);
     showToast("Duplicated.", "success");
-    await _rerenderLibrary();
+    await _rerenderLibrary();  // full re-render — new card needs to appear
   } catch (e) {
     showToast("Duplicate failed: " + e.message, "error");
   }
@@ -817,7 +846,7 @@ async function _handleArchive(id) {
   try {
     await archiveWorksheet(id);
     showToast("Archived.");
-    await _rerenderLibrary();
+    _removeCardAndUpdateCounts(id);
   } catch (e) {
     showToast("Archive failed: " + e.message, "error");
   }
@@ -827,7 +856,7 @@ async function _handleUnarchive(id) {
   try {
     await unarchiveWorksheet(id);
     showToast("Restored.", "success");
-    await _rerenderLibrary();
+    _removeCardAndUpdateCounts(id);
   } catch (e) {
     showToast("Restore failed: " + e.message, "error");
   }
@@ -838,7 +867,7 @@ async function _handleRecover(id) {
   try {
     await unarchiveWorksheet(id);
     showToast("Paper recovered.", "success");
-    await _rerenderLibrary();
+    _removeCardAndUpdateCounts(id);
   } catch (e) {
     showToast("Recover failed: " + e.message, "error");
   }
@@ -851,8 +880,8 @@ async function _handleDelete(id) {
   if (!confirm(`Permanently delete "${title}"? This cannot be undone.`)) return;
   try {
     await deleteWorksheet(id);
-    showToast("Paper deleted.", "success");
-    await _rerenderLibrary();
+    showToast("Deleted.", "success");
+    _removeCardAndUpdateCounts(id);
   } catch (e) {
     showToast("Delete failed: " + e.message, "error");
   }

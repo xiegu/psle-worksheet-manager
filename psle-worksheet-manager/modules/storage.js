@@ -132,21 +132,39 @@ async function _migrateIDBToServer() {
 }
 
 /**
- * Open IndexedDB, migrate IDB→server if needed, sync from server, and prime
- * the active-student cache. Must be awaited before any other storage call.
+ * Open IndexedDB, prime the active-student cache, and sync from server.
+ * If IDB already has data, sync happens in the background (non-blocking).
+ * On first boot (empty IDB), sync blocks so the app has data to show.
  */
 async function initDB() {
   _db = await _openDB();
 
-  try {
-    await _migrateIDBToServer();
-    await _syncFromServer();
-  } catch (e) {
-    console.warn("[storage] Server sync failed — using IDB cache:", e.message);
-  }
+  // Check if IDB already has data (repeat visit)
+  const existingData = await _storeGetAll(WS_STORE);
+  const hasCache = existingData.length > 0;
 
-  const activeId = localStorage.getItem(ACTIVE_STUDENT_KEY);
-  if (activeId) _cachedActiveStudent = await getStudent(activeId);
+  if (hasCache) {
+    // IDB has data — prime cache immediately, sync in background
+    const activeId = localStorage.getItem(ACTIVE_STUDENT_KEY);
+    if (activeId) _cachedActiveStudent = await getStudent(activeId);
+
+    // Background sync — don't block the app
+    _migrateIDBToServer()
+      .then(() => _syncFromServer())
+      .then(() => console.log("[storage] Background sync complete"))
+      .catch(e => console.warn("[storage] Background sync failed:", e.message));
+  } else {
+    // First boot — must block so the app has data
+    try {
+      await _migrateIDBToServer();
+      await _syncFromServer();
+    } catch (e) {
+      console.warn("[storage] Server sync failed — using IDB cache:", e.message);
+    }
+
+    const activeId = localStorage.getItem(ACTIVE_STUDENT_KEY);
+    if (activeId) _cachedActiveStudent = await getStudent(activeId);
+  }
 }
 
 // ---------------------------------------------------------------------------

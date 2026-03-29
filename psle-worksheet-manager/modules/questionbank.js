@@ -22,6 +22,8 @@ let _builtSourceKeys = new Set(); // sourceKeys present in any active worksheet 
 // Cache to avoid redundant DB fetches on filter changes (#23)
 let _enrichedQCache       = null;
 let _builtSourceKeysCache = null;
+let _filteredQCache       = null;  // cached filtered list — invalidated on filter change
+let _lastFilterKey        = "";    // serialised filter state for cache invalidation
 
 // Pagination
 const _QB_PAGE_SIZE = 30;
@@ -35,6 +37,8 @@ async function renderQuestionBank(container) {
   _selected.clear();
   _enrichedQCache       = null;  // reset caches on full render
   _builtSourceKeysCache = null;
+  _filteredQCache       = null;
+  _lastFilterKey        = "";
   _qbPage               = 0;
   const allQ = await _getAllEnrichedQuestions();
 
@@ -258,7 +262,13 @@ async function _renderQBGrid() {
   }
   _builtSourceKeys = _builtSourceKeysCache;
 
-  const filtered   = _applyQBFilters(allQ);
+  // Cache filtered results — skip re-filtering on page turns
+  const filterKey = JSON.stringify(_qbFilters);
+  if (filterKey !== _lastFilterKey || !_filteredQCache) {
+    _filteredQCache = _applyQBFilters(allQ);
+    _lastFilterKey  = filterKey;
+  }
+  const filtered = _filteredQCache;
   const totalPages = Math.ceil(filtered.length / _QB_PAGE_SIZE) || 1;
   _qbPage = Math.min(_qbPage, totalPages - 1);
   const paged = filtered.slice(_qbPage * _QB_PAGE_SIZE, (_qbPage + 1) * _QB_PAGE_SIZE);
@@ -396,11 +406,11 @@ function _htmlQCard(q, builtSourceKeys) {
 // ---------------------------------------------------------------------------
 
 function _bindQBFilters() {
-  document.getElementById("qbf-search")?.addEventListener("input", e => {
+  document.getElementById("qbf-search")?.addEventListener("input", _debounce(e => {
     _qbFilters.search = e.target.value;
     _qbPage = 0;
     _renderQBGrid();
-  });
+  }, 250));
 
   document.getElementById("qbf-level")?.addEventListener("change", e => {
     _qbFilters.level  = e.target.value;
