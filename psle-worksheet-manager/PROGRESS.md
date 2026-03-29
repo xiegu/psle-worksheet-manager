@@ -98,12 +98,10 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 - [ ] **Scrape more papers** ([#3](https://github.com/xiegu/psle-worksheet-manager/issues/3)) — run scraper for other schools, years, levels (P5, P4)
 
 ### Reliability
-- [ ] **Server write lock** ([#25](https://github.com/xiegu/psle-worksheet-manager/issues/25)) — add per-collection mutex to prevent concurrent file corruption
-- [ ] **Show API sync failure warning** ([#26](https://github.com/xiegu/psle-worksheet-manager/issues/26)) — toast + sync indicator when server write fails silently
-- [ ] **Double-click guard on card actions** ([#30](https://github.com/xiegu/psle-worksheet-manager/issues/30)) — disable buttons during async operations to prevent duplicate actions
+*(all reliability issues resolved)*
 
 ### Bug fixes
-- [ ] **Score date null crash** ([#28](https://github.com/xiegu/psle-worksheet-manager/issues/28)) — null guard on date sort in students module
+*(all bug fixes resolved)*
 
 ### Enhancements
 *(all enhancement issues resolved)*
@@ -114,6 +112,12 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 ---
 
 ## Changes (2026-03-29)
+
+### Server write lock (#25), sync warnings (#26), null date fix (#28), double-click guard (#30)
+- **`server.js`** — added per-collection promise-chain mutex (`withLock`); PUT, DELETE, and bulk POST routes now serialise writes per collection, preventing concurrent file corruption
+- **`modules/storage.js`** — replaced 11 silent `console.warn` calls with `_syncWarn()` helper that shows an error toast + logs to console; added null guard on date sort in `getScoresForWorksheet()`
+- **`modules/students.js`** — added null guard on date sort in score history rendering
+- **`modules/library.js`** — `_onCardClick` now disables the clicked button during async operations and re-enables on completion via `.finally(restore)`
 
 ### Batch print (#4) + Separate answer key page (#5)
 - **`modules/preview.js`** — refactored `generateWorksheetHTML` to use shared `_buildPageDivs(ws, teacherMode)` helper and extracted `_PRINT_CSS` constant; teacher mode now produces two separate `.page` divs: questions page + answer key page (page break between them); added `openBatchPrintWindow(worksheets)` for single-session multi-worksheet printing (student copy); exposed globally
@@ -142,6 +146,10 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 | Issue | What was done |
 |-------|---------------|
+| [#30](https://github.com/xiegu/psle-worksheet-manager/issues/30) | Double-click guard: card action buttons disabled during async, re-enabled on completion |
+| [#28](https://github.com/xiegu/psle-worksheet-manager/issues/28) | Null guard on date sort in `getScoresForWorksheet()` and students score history |
+| [#26](https://github.com/xiegu/psle-worksheet-manager/issues/26) | `_syncWarn()` replaces 11 silent `console.warn` calls with error toast + console log |
+| [#25](https://github.com/xiegu/psle-worksheet-manager/issues/25) | Per-collection promise-chain mutex in `server.js` — serialises PUT/DELETE/bulk writes |
 | [#5](https://github.com/xiegu/psle-worksheet-manager/issues/5) | Teacher mode print: answer key now on its own page (separate `.page` div with page break) |
 | [#4](https://github.com/xiegu/psle-worksheet-manager/issues/4) | Batch print: "Print (n)" in bulk bar opens one print session for all selected worksheets (student copy) |
 | [#29](https://github.com/xiegu/psle-worksheet-manager/issues/29) | Removed stale `.badge-new`, `.badge-moved-up`, `.badge-moved-down` CSS from `preview.js` inline styles |
@@ -187,4 +195,4 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-29 — closed #4 (batch print), #5 (separate answer key page)*
+*Last updated: 2026-03-29 — closed #25 (write lock), #26 (sync warnings), #28 (null date), #30 (double-click guard)*

@@ -772,16 +772,23 @@ async function _switchTab(tab) {
 
 function _onCardClick(e) {
   const btn = e.target.closest("button[data-id]");
-  if (!btn) return;
+  if (!btn || btn.disabled) return;
   const id = btn.dataset.id;
   if (btn.classList.contains("btn-card-preview"))   { navigate("preview", { editingId: id }); return; }
   if (btn.classList.contains("btn-card-edit"))      { navigate("builder", { editingId: id }); return; }
-  if (btn.classList.contains("btn-card-duplicate")) { _handleDuplicate(id);   return; }
-  if (btn.classList.contains("btn-card-archive"))   { _handleArchive(id);     return; }
-  if (btn.classList.contains("btn-card-unarchive")) { _handleUnarchive(id);   return; }
-  if (btn.classList.contains("btn-card-recover"))   { _handleRecover(id);     return; }
-  if (btn.classList.contains("btn-card-delete"))    { _handleDelete(id);      return; }
-  if (btn.classList.contains("btn-card-score"))     { _handleRecordScore(id); return; }
+
+  // Disable button during async operations to prevent double-clicks
+  btn.disabled = true;
+  const restore = () => { btn.disabled = false; };
+
+  if (btn.classList.contains("btn-card-duplicate")) { _handleDuplicate(id).finally(restore);   return; }
+  if (btn.classList.contains("btn-card-archive"))   { _handleArchive(id).finally(restore);     return; }
+  if (btn.classList.contains("btn-card-unarchive")) { _handleUnarchive(id).finally(restore);   return; }
+  if (btn.classList.contains("btn-card-recover"))   { _handleRecover(id).finally(restore);     return; }
+  if (btn.classList.contains("btn-card-delete"))    { _handleDelete(id).finally(restore);      return; }
+  if (btn.classList.contains("btn-card-score"))     { _handleRecordScore(id).finally(restore); return; }
+
+  restore();  // no match — re-enable
 }
 
 // ---------------------------------------------------------------------------

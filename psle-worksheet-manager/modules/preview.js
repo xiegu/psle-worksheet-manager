@@ -544,9 +544,7 @@ function _injectPreviewStyles() {
       margin-left: 4px;
     }
     .ws-badge--level      { background: #1a56a0; color: #fff; }
-    .ws-badge--new        { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-    .ws-badge--moved-up   { background: #cce5ff; color: #004085; border: 1px solid #b8daff; }
-    .ws-badge--moved-down { background: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
+
 
     /* Info row */
     .pv-info-row {

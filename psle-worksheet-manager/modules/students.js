@@ -88,7 +88,7 @@ function _htmlStudentDetail(stu, wsMap) {
   const takenCount  = [...wsMap.values()]
     .reduce((sum, ws) => sum + (ws.questions || []).length, 0);
   const scoresCount = (stu.scores || []).length;
-  const allScores   = (stu.scores || []).slice().sort((a, b) => b.date.localeCompare(a.date));
+  const allScores   = (stu.scores || []).slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 
   const scoresHtml = allScores.length === 0
     ? `<p style="color:var(--grey-400);font-size:12px">No scores recorded yet.</p>`

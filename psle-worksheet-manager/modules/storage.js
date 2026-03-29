@@ -21,6 +21,12 @@ const API_BASE = "/api";
 let _db = null;
 let _cachedActiveStudent = null;   // kept in sync with every saveStudent / deleteStudent call
 
+/** Show a sync-failure warning to the user (toast + console). */
+function _syncWarn(msg) {
+  console.warn("[storage] " + msg);
+  if (typeof showToast === "function") showToast("Sync warning: " + msg, "error");
+}
+
 // ---------------------------------------------------------------------------
 // API helpers
 // ---------------------------------------------------------------------------
@@ -214,7 +220,7 @@ async function saveWorksheet(ws) {
     if (existing) {
       const updated = { ...existing, ...ws, updatedAt: now, version: (existing.version || 1) + 1 };
       try { await _apiPut(_wsApiPath(updated) + "/" + updated.id, updated); }
-      catch (e) { console.warn("[storage] API write failed:", e.message); }
+      catch (e) { _syncWarn("Save failed — changes may not persist to disk."); }
       await _storePut(WS_STORE, updated);
       return updated;
     }
@@ -231,7 +237,7 @@ async function saveWorksheet(ws) {
     updatedAt: now
   };
   try { await _apiPut(_wsApiPath(created) + "/" + created.id, created); }
-  catch (e) { console.warn("[storage] API write failed:", e.message); }
+  catch (e) { _syncWarn("Save failed — changes may not persist to disk."); }
   await _storePut(WS_STORE, created);
   return created;
 }
@@ -241,7 +247,7 @@ async function deleteWorksheet(id) {
   const existing = await getWorksheet(id);
   if (!existing) return false;
   try { await _apiDelete(_wsApiPath(existing) + "/" + id); }
-  catch (e) { console.warn("[storage] API delete failed:", e.message); }
+  catch (e) { _syncWarn("Delete failed — item may reappear after refresh."); }
   await _storeDelete(WS_STORE, id);
   return true;
 }
@@ -252,7 +258,7 @@ async function archiveWorksheet(id) {
   if (!ws) return null;
   const updated = { ...ws, status: "archived", updatedAt: _today() };
   try { await _apiPut(_wsApiPath(updated) + "/" + updated.id, updated); }
-  catch (e) { console.warn("[storage] API write failed:", e.message); }
+  catch (e) { _syncWarn("Archive failed — change may not persist to disk."); }
   await _storePut(WS_STORE, updated);
   return updated;
 }
@@ -263,7 +269,7 @@ async function unarchiveWorksheet(id) {
   if (!ws) return null;
   const updated = { ...ws, status: "active", updatedAt: _today() };
   try { await _apiPut(_wsApiPath(updated) + "/" + updated.id, updated); }
-  catch (e) { console.warn("[storage] API write failed:", e.message); }
+  catch (e) { _syncWarn("Restore failed — change may not persist to disk."); }
   await _storePut(WS_STORE, updated);
   return updated;
 }
@@ -353,14 +359,14 @@ async function importAll(jsonString) {
     if (papers.length > 0)     ops.push(_apiPost("/papers/bulk", papers));
     if (worksheets.length > 0) ops.push(_apiPost("/worksheets/bulk", worksheets));
     await Promise.all(ops);
-  } catch (e) { console.warn("[storage] API bulk import failed:", e.message); }
+  } catch (e) { _syncWarn("Import failed — data may not persist to disk."); }
 
   // Import students (v2+ backups)
   if (Array.isArray(parsed.students)) {
     const validStudents = parsed.students.filter(s => s.id && s.name);
     if (validStudents.length > 0) {
       try { await _apiPost("/students/bulk", validStudents); }
-      catch (e) { console.warn("[storage] API student import failed:", e.message); }
+      catch (e) { _syncWarn("Student import failed — data may not persist to disk."); }
     }
   }
 
@@ -407,7 +413,7 @@ async function clearAll() {
     for (const p of papersAll) ops.push(_apiDelete("/papers/" + p.id));
     for (const s of stuAll)    ops.push(_apiDelete("/students/" + s.id));
     await Promise.all(ops);
-  } catch (e) { console.warn("[storage] API clear failed:", e.message); }
+  } catch (e) { _syncWarn("Clear failed — server data may not be fully wiped."); }
 }
 
 // ---------------------------------------------------------------------------
@@ -438,7 +444,7 @@ async function saveStudent(student) {
     if (existing) {
       const updated = { ...existing, ...student };
       try { await _apiPut("/students/" + updated.id, updated); }
-      catch (e) { console.warn("[storage] API write failed:", e.message); }
+      catch (e) { _syncWarn("Student save failed — changes may not persist to disk."); }
       await _storePut(STU_STORE, updated);
       if (_cachedActiveStudent && _cachedActiveStudent.id === updated.id) {
         _cachedActiveStudent = updated;
@@ -454,7 +460,7 @@ async function saveStudent(student) {
     createdAt: now
   };
   try { await _apiPut("/students/" + created.id, created); }
-  catch (e) { console.warn("[storage] API write failed:", e.message); }
+  catch (e) { _syncWarn("Student save failed — changes may not persist to disk."); }
   await _storePut(STU_STORE, created);
   return created;
 }
@@ -464,7 +470,7 @@ async function deleteStudent(id) {
   const existing = await getStudent(id);
   if (!existing) return false;
   try { await _apiDelete("/students/" + id); }
-  catch (e) { console.warn("[storage] API delete failed:", e.message); }
+  catch (e) { _syncWarn("Student delete failed — may reappear after refresh."); }
   await _storeDelete(STU_STORE, id);
   if (_cachedActiveStudent && _cachedActiveStudent.id === id) {
     _cachedActiveStudent = null;
@@ -538,5 +544,5 @@ function getScoresForWorksheet(studentId, wsId) {
   if (!student || student.id !== studentId) return [];
   return (student.scores || [])
     .filter(s => s.wsId === wsId)
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
 }
