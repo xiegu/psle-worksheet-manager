@@ -7,7 +7,7 @@
 // ---------------------------------------------------------------------------
 
 const AppState = {
-  currentView:   "library",   // "library" | "builder" | "preview" | "questionbank" | "students"
+  currentView:   "library",   // "library" | "builder" | "preview" | "questionbank" | "students" | "syllabus"
   editingId:     null,        // worksheet id being edited, or null for new
   bankQuestions: null,        // questions pre-loaded from Question Bank
   bankMeta:      null         // worksheet metadata pre-loaded from Question Bank
@@ -36,6 +36,7 @@ async function navigate(view, params = {}) {
   else if (view === "builder")      await renderBuilder(main, AppState.editingId);
   else if (view === "preview")      await renderPreview(main, AppState.editingId);
   else if (view === "questionbank") await renderQuestionBank(main);
+  else if (view === "syllabus")     renderSyllabusView(main);
   else if (view === "students")     await renderStudents(main);
 
   window.scrollTo(0, 0);

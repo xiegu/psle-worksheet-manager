@@ -1244,6 +1244,154 @@ button { cursor: pointer; font-family: inherit; }
 }
 
 /* -------------------------------------------------------------------------
+   Syllabus view
+------------------------------------------------------------------------- */
+
+.syl-wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.syl-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+}
+
+.syl-section__title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--grey-500);
+  margin-bottom: 12px;
+}
+
+.syl-intro {
+  font-size: 13px;
+  color: var(--grey-500);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+/* Changes at a glance */
+.syl-changes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.syl-change-col__heading {
+  margin-bottom: 8px;
+}
+
+.syl-change-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.syl-change-list li {
+  font-size: 13px;
+  color: var(--grey-700);
+  padding-left: 10px;
+  position: relative;
+  line-height: 1.4;
+}
+
+.syl-change-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--grey-400);
+}
+
+/* Level tabs */
+.syl-level-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.syl-level-tab {
+  padding: 5px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--grey-600);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+
+.syl-level-tab:hover {
+  background: var(--grey-100);
+}
+
+.syl-level-tab.active {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+
+/* Strand blocks */
+.syl-strand-block {
+  margin-bottom: 18px;
+}
+
+.syl-strand-block:last-child {
+  margin-bottom: 0;
+}
+
+.syl-strand-name {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--grey-500);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.syl-topic-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.syl-topic-item {
+  font-size: 14px;
+  color: var(--grey-800);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.syl-none {
+  font-size: 13px;
+  color: var(--grey-400);
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .syl-changes-grid { grid-template-columns: 1fr; }
+}
+
+/* -------------------------------------------------------------------------
    Print styles — hide all app chrome, show only worksheet content
 ------------------------------------------------------------------------- */
 @media print {
