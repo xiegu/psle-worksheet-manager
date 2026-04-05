@@ -779,6 +779,8 @@ function _showQEditModal(q) {
 
     try {
       await saveWorksheet(ws);
+      _enrichedQCache = null;  // invalidate so grid re-reads updated question
+      _filteredQCache = null;
       close();
       _renderQBGrid();
     } catch (err) {

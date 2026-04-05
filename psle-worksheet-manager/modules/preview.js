@@ -70,7 +70,7 @@ function _renderPage(ws, teacherMode) {
     ${teacherMode ? `<div class="pv-watermark">ANSWER KEY</div>` : ""}
 
     <div class="pv-ws-header">
-      <div class="pv-logo"><img src="logo.png" alt="Logo" /></div>
+      <div class="pv-logo"><img src="${window.LOGO_DATA_URL || "logo.png"}" alt="Logo" /></div>
       <div class="pv-title-block">
         <h1 class="pv-ws-title">${_esc((ws.subject||"Maths")+" Worksheet")}</h1>
         <div class="pv-ws-meta">

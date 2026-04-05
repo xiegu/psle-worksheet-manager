@@ -426,11 +426,13 @@ async function clearAll() {
     const [wsAll, papersAll, stuAll] = await Promise.all([
       _apiGet("/worksheets"), _apiGet("/papers"), _apiGet("/students")
     ]);
-    const ops = [];
-    for (const w of wsAll)     ops.push(_apiDelete("/worksheets/" + w.id));
-    for (const p of papersAll) ops.push(_apiDelete("/papers/" + p.id));
-    for (const s of stuAll)    ops.push(_apiDelete("/students/" + s.id));
-    await Promise.all(ops);
+    const results = await Promise.allSettled([
+      ...wsAll.map(w     => _apiDelete("/worksheets/" + w.id)),
+      ...papersAll.map(p => _apiDelete("/papers/"     + p.id)),
+      ...stuAll.map(s    => _apiDelete("/students/"   + s.id))
+    ]);
+    const failed = results.filter(r => r.status === "rejected").length;
+    if (failed) _syncWarn(`Clear incomplete — ${failed} item(s) could not be deleted from server.`);
   } catch (e) { _syncWarn("Clear failed — server data may not be fully wiped."); }
 }
 

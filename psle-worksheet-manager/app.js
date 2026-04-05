@@ -29,6 +29,9 @@ async function navigate(view, params = {}) {
     else          btn.removeAttribute("aria-current");
   });
 
+  // Remove any orphaned modals (e.g. user navigated away without closing)
+  document.querySelectorAll(".qb-modal-overlay").forEach(m => m.remove());
+
   const main = document.getElementById("app-main");
   main.innerHTML = "";
 

@@ -10,7 +10,7 @@ let _draft     = {};       // metadata fields
 let _questions = [];       // array of question objects
 let _teacherPreview = false;
 let _dragSrcIdx = null;    // drag-and-drop source index
-let _undoSnapshot = null;  // last undo snapshot of _questions
+let _undoStack = [];       // undo history (max 5 snapshots of _questions)
 let _titleManuallyEdited = false; // true once user has typed in the title field
 
 // ---------------------------------------------------------------------------
@@ -39,7 +39,7 @@ async function renderBuilder(container, editingId) {
   AppState.bankQuestions = null;
   AppState.bankMeta      = null;
   _teacherPreview = false;
-  _undoSnapshot   = null;
+  _undoStack      = [];
 
   container.innerHTML = `
     <div class="builder-layout">
@@ -274,7 +274,7 @@ function _htmlActionBar() {
   const isEditing = !!_draft.id;
   return `
     <button class="btn" id="btn-cancel">&#8592; Back to Library</button>
-    <button class="btn" id="btn-undo" style="display:${_undoSnapshot?"":"none"}">&#8617; Undo</button>
+    <button class="btn" id="btn-undo" style="display:${_undoStack.length?"":"none"}">&#8617; Undo</button>
     <button class="btn btn-primary" id="btn-save">
       ${isEditing ? "Save Changes" : "Save to Library"}
     </button>
@@ -379,12 +379,13 @@ function _newQId() {
   return "q_" + Date.now() + "_" + Math.floor(Math.random() * 1e6);
 }
 
-/** Save questions snapshot for undo */
+/** Save questions snapshot for undo (keeps last 5) */
 function _saveUndo() {
-  _undoSnapshot = _questions.map(q => ({
+  _undoStack.push(_questions.map(q => ({
     ...q,
     options: q.options ? [...q.options] : undefined
-  }));
+  })));
+  if (_undoStack.length > 5) _undoStack.shift();
   const btn = document.getElementById("btn-undo");
   if (btn) btn.style.display = "";
 }
@@ -461,7 +462,7 @@ function _bindMetadata() {
   on("f-title", "input", e => {
     _draft.title = e.target.value;
     _titleManuallyEdited = e.target.value.trim() !== "";
-    _refreshPreview();
+    _refreshPreviewDebounced();
   });
 
   on("f-level", "change", e => {
@@ -580,18 +581,18 @@ function _bindQuestions() {
 
     if (e.target.classList.contains("q-text-input")) {
       _questions[idx].text = e.target.value;
-      _refreshPreview();
+      _refreshPreviewDebounced();
     } else if (e.target.classList.contains("q-answer-input")) {
       _questions[idx].answer = e.target.value;
-      _refreshPreview();
+      _refreshPreviewDebounced();
     } else if (e.target.classList.contains("q-working-input")) {
       _questions[idx].working = e.target.value;
-      if (_teacherPreview) _refreshPreview();
+      if (_teacherPreview) _refreshPreviewDebounced();
     } else if (e.target.classList.contains("q-option-input")) {
       const opt = parseInt(e.target.dataset.opt);
       if (!_questions[idx].options) _questions[idx].options = ["","","",""];
       _questions[idx].options[opt] = e.target.value;
-      _refreshPreview();
+      _refreshPreviewDebounced();
     }
   });
 
@@ -641,12 +642,11 @@ function _bindActionBar() {
   });
 
   document.getElementById("btn-undo")?.addEventListener("click", () => {
-    if (!_undoSnapshot) return;
-    _questions = _undoSnapshot;
-    _undoSnapshot = null;
+    if (!_undoStack.length) return;
+    _questions = _undoStack.pop();
     _rerenderQuestions();
     const btn = document.getElementById("btn-undo");
-    if (btn) btn.style.display = "none";
+    if (btn) btn.style.display = _undoStack.length ? "" : "none";
     showToast("Undone.", "success");
   });
 
@@ -710,6 +710,8 @@ function _refreshPreview() {
   const el = document.getElementById("preview-body");
   if (el) el.innerHTML = _htmlPreviewContent();
 }
+
+const _refreshPreviewDebounced = _debounce(_refreshPreview, 150);
 
 // ---------------------------------------------------------------------------
 // Validation

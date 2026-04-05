@@ -207,4 +207,53 @@ Then import the output JSON via the **↑ Import** button in the app.
 
 ---
 
-*Last updated: 2026-03-29 — closed #31–#35 (performance + cleanup)*
+---
+
+## Code Review Findings (2026-04-04)
+
+Items identified during a full review of `modules/`. Prioritised by impact.
+
+### Should fix
+
+- [ ] **Stale QB cache after edit** — `_enrichedQCache` in `questionbank.js` is not invalidated when a question is edited via the edit modal. The edit modal calls `_renderQBGrid()` which reads from the stale cache. Fix: set `_enrichedQCache = null` in the `qb-edit-save` handler before calling `_renderQBGrid()`.
+
+- [ ] **No debounce on builder preview** — every keystroke in question text/answer/working triggers `_refreshPreview()` immediately in `builder.js`. For worksheets with many questions, this causes visible lag. Fix: wrap `_refreshPreview()` calls from `input` events with `_debounce()` (already available in `utils.js`).
+
+- [ ] **Modals not cleaned up on navigation** — modals appended to `document.body` (QB picker, edit modal, score modal, assign-topic modal) persist if the user navigates away via `navigate()` without closing them. Fix: add a cleanup sweep in `app.js` router that removes any `.qb-modal-overlay` elements before rendering the new view.
+
+### Nice to have
+
+- [ ] **Single-level undo** — `builder.js` keeps only one `_undoSnapshot`. Multiple destructive actions (delete → move → delete) only undo the last one. Could extend to a small stack (e.g., 5 deep).
+
+- [ ] **`_esc()` doesn't escape single quotes** — `utils.js` escapes `& < > "` but not `'`. Safe with current double-quoted attributes, but would break if any template literal uses single-quoted HTML attributes. Fix: add `.replace(/'/g, "&#39;")`.
+
+- [ ] **`clearAll` swallows individual delete failures** — `storage.js` fires all deletes in parallel and catches the batch. Some items may survive silently. Fix: collect and report failures.
+
+- [ ] **Logo inconsistency between preview and print** — in-app preview (`preview.js`) uses `<img src="logo.png">`, but print (`_buildPageDivs`) uses `window.LOGO_DATA_URL` with a "WM" placeholder fallback. Print may look different if the data URL isn't set.
+
+### Won't fix (acceptable trade-offs)
+
+- **Global namespace** — all functions are globals. Acceptable for a vanilla JS SPA with no bundler; the `_` prefix convention is consistently followed.
+- **`innerHTML` re-rendering** — standard pattern for this codebase; focus loss is mitigated by the existing `_rebuildFilterBar` focus-restore pattern. Extending it to builder questions would add complexity for marginal gain.
+- **`_parsePaperMeta` regex fragility** — title parsing is a fallback for papers imported before explicit metadata fields were added. New imports include `school/year/subject/paperType` directly.
+
+*Last updated: 2026-04-04 — code review findings added*
+
+---
+
+## Changes (2026-04-05)
+
+### Code review fixes
+
+**Should fix (all done):**
+- **`modules/questionbank.js`** — invalidate `_enrichedQCache` and `_filteredQCache` in the edit-save handler so the grid re-reads the updated question immediately after saving
+- **`modules/builder.js`** — debounce preview refresh (150ms) for all `input` events (question text, answer, working, options, title); discrete `change` events and button actions remain immediate
+- **`app.js`** — sweep all `.qb-modal-overlay` elements before rendering each new view, cleaning up any modals left open when the user navigates away
+
+**Nice to have (all done):**
+- **`modules/builder.js`** — replaced single `_undoSnapshot` with `_undoStack` (max 5); each undo pops the stack; button hides when stack is empty
+- **`modules/utils.js`** — `_esc()` now escapes single quotes (`'` → `&#39;`) in addition to `& < > "`
+- **`modules/storage.js`** — `clearAll()` now uses `Promise.allSettled` for individual deletes and reports the count of any that fail via `_syncWarn`
+- **`modules/preview.js`** — in-app preview logo now uses `window.LOGO_DATA_URL` (consistent with print output), with `logo.png` as fallback
+
+*Last updated: 2026-04-05 — closed all 7 code review items*
