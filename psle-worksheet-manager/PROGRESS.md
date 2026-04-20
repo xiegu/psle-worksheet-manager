@@ -111,6 +111,15 @@ PDF size:                4.4 MB (scanned, CCITT-encoded)
 
 ---
 
+## Changes (2026-04-20)
+
+### Print layout fixes
+- **`modules/preview.js`**, **`templates/worksheet.html`**, **`style.css`** — fixed two print issues:
+  - **Page 2+ top margin**: added `box-decoration-break: clone` to `.page` so the 15mm padding re-applies at the top of every continuation page, not just the first
+  - **Timestamp / "about:blank" headers**: reverted `@page { margin }` back to `0` so Chrome's built-in print headers have no space to render; margins are handled entirely by `.page { padding: 15mm }`
+
+---
+
 ## Changes (2026-03-29)
 
 ### Performance & cleanup (#31–#35)

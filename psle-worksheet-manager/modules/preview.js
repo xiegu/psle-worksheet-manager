@@ -254,7 +254,7 @@ const _PRINT_CSS = `
   .ak-table thead tr{background:#f2dede}
   @media print{
     body{background:none;padding:0;orphans:2;widows:2}
-    .page{width:210mm;min-height:297mm;margin:0;padding:15mm;box-shadow:none;page-break-after:always}
+    .page{width:210mm;min-height:297mm;margin:0;padding:15mm;box-shadow:none;page-break-after:always;-webkit-box-decoration-break:clone;box-decoration-break:clone}
     .question{page-break-inside:avoid;break-inside:avoid}
     .diagram-img{max-height:80mm}
     .badge{-webkit-print-color-adjust:exact;print-color-adjust:exact}
